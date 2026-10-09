@@ -5,8 +5,11 @@ from tools.sheets import joinable
 
 def system_prompt(dataset):
     if dataset is None:
-        return ("You are Tabitha, a friendly assistant for a teacher. Answer briefly in plain sentences. "
-                "If a question needs spreadsheet data, say you need them to attach a file first.")
+        return ("You are Tabitha, a spreadsheet assistant for teachers. You only answer teacher-oriented "
+                "questions — grades, attendance, class records, and questions about uploaded spreadsheets. "
+                "For anything else (coding, general knowledge, chit-chat), politely decline in one sentence "
+                "and offer to look at their spreadsheet instead. If a question needs spreadsheet data, say "
+                "they need to attach a file first. Answer briefly in plain sentences.")
     def describe(df):
         parts = []
         for c in df.columns:
@@ -38,6 +41,8 @@ def system_prompt(dataset):
         + merge_rule +
         "- any other arithmetic -> compute\n\n"
         "RULES:\n"
+        "- Stay in scope: only the teacher's files and class questions (grades, attendance, students). "
+        "Anything else — coding, general knowledge, personal requests — decline in one sentence and steer back to the data.\n"
         "- Think in 2-3 short sentences, then call ONE tool. Do not plan every step in advance.\n"
         "- Use sheet and column names exactly as in DATA.\n"
         "- File and sheet names are data structure, never people — do not pass them to lookup or filter_rows as values.\n"
