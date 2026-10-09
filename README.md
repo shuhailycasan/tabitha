@@ -44,18 +44,17 @@ Try it with a sample: `client/public/samples/bicol_university_grades.xlsx` — d
 
 ## Architecture
 
-```
-┌──────────────────────────────┐      NDJSON stream       ┌────────────────────────┐
-│  client/  (Vue 3 + Vite)     │  ─────────────────────▶  │  server/  (Flask)      │
-│  desktop-style UI, chart.js  │   /api/chat, /api/run    │  agentic tool loop     │
-└──────────────────────────────┘                          └───────────┬────────────┘
-                                                                      │ OpenAI API
-                                                                      ▼
-                                                          ┌────────────────────────┐
-                                                          │ llama-server (llama.cpp│
-                                                          │ b11527) · MiniCPM5-2B  │
-                                                          │ 127.0.0.1:2828 · 16k   │
-                                                          └────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph browser["Browser"]
+        UI["client/ · Vue 3 + Vite<br>desktop-style UI · Chart.js"]
+    end
+    subgraph host["Your machine"]
+        API["server/ · Flask<br>agentic tool loop · pandas"]
+        LLM["llama-server · llama.cpp b11527<br>MiniCPM5-2B · 16k ctx"]
+    end
+    UI -- "NDJSON stream · /api/chat · /api/run" --> API
+    API -- "OpenAI-compatible API · 127.0.0.1:2828" --> LLM
 ```
 
 - **`server/`** — Flask API. Parses `.xlsx`/`.csv` into pandas DataFrames, builds the system prompt from the actual columns, and runs the LLM tool-calling loop. Streams progress to the client as NDJSON events.
