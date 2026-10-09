@@ -67,6 +67,14 @@ TOOLS = [
          "sort_by": {**_COL, "description": "Optional column to sort by"},
          "ascending": _ASC, "limit": {"type": "integer", "description": "Max rows (default 30)"}},
         ["sheet"]),
+    _fn("group_stats",
+        "Totals or averages per group — group rows by one column, aggregate the numeric columns. "
+        "Use for: which section/class/month has the most X, per-group totals or averages, compare groups.",
+        {"sheet": _SHEET, "by": {**_COL, "description": "Column to group by (e.g. a section, class, category)"},
+         "columns": {"type": "array", "items": {"type": "string"}, "description": "Numeric columns to aggregate. Omit for all numeric."},
+         "op": {"type": "string", "enum": ["sum", "avg", "min", "max", "count"], "description": "Default sum"},
+         "ascending": _ASC},
+        ["sheet", "by"]),
     _fn("lookup",
         "Everything about one person/item: finds rows matching a name in EVERY sheet. "
         "Use for: how is Liam doing, tell me about Ana, Gia's grades and attendance.",
@@ -239,6 +247,17 @@ def run_tool(dataset, name, args):
                    "<": cmp_s < cmp_v, ">=": cmp_s >= cmp_v, "<=": cmp_s <= cmp_v}
             mask = ops[op].fillna(False)
         return {"matches": int(mask.sum()), "rows": rows_json(df[mask], args.get("limit", 20))}
+    if name == "group_stats":
+        by = get_col(df, args["by"])
+        cols = [get_col(df, c) for c in (args.get("columns") or df.select_dtypes("number").columns)]
+        cols = [c for c in cols if c != by]
+        op = args.get("op", "sum")
+        if op == "count" or not cols:
+            g = df.groupby(by).size().reset_index(name="count")
+        else:
+            g = df.groupby(by)[cols].agg({"avg": "mean", "sum": "sum", "min": "min", "max": "max"}.get(op, "sum")).round(2).reset_index()
+        g = g.sort_values(g.columns[1], ascending=bool(args.get("ascending", False)))
+        return {"table": md_table(g, len(g))}
     if name == "row_stats":
         cols = [get_col(df, c) for c in args.get("columns") or df.select_dtypes("number").columns]
         stat = getattr(df[cols], {"avg": "mean", "sum": "sum", "min": "min", "max": "max"}[args.get("op", "avg")])(axis=1)
@@ -273,6 +292,7 @@ def system_prompt(dataset):
         "- top N / best / worst ranking of one column -> top_rows\n"
         "- who is above/below a value, how many match -> filter_rows\n"
         "- each student's average or total across several columns -> row_stats\n"
+        "- per section/class/category totals, which group has the most X -> group_stats\n"
         "- everything about one student -> lookup\n"
         "- list / show students or rows, or any request for a table -> list_rows, then paste its table into your answer exactly as given\n"
         + merge_rule +
