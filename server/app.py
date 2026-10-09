@@ -14,6 +14,7 @@ UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 CLIENT_DIR = Path(__file__).parent.parent / "client" / "dist"  # vite build output
 MAX_TOOL_RESULT_CHARS = 4000  # keep results small; the model has 8192 tokens total
+CTX_TOKENS = 8192  # llama.cpp context window
 MAX_TOKENS = 4096  # reasoning model: ~2500 tokens of thinking before a tool call; 1024 truncated to nothing
 
 # static_url_path="" serves dist/assets/... at the root-absolute paths Vite emits
@@ -396,6 +397,23 @@ def delete_dataset(ds_id):
     return jsonify({"ok": True})
 
 
+def compact_history(msgs, budget):
+    """Fit chat history into a char budget: keep newest turns, drop oldest. The last
+    message (the question being asked) is always kept and head-truncated if huge."""
+    out, room = [], budget
+    for m in reversed(msgs):
+        n = len(m.get("content") or "")
+        if not out:  # the current question
+            if n > room:
+                m = {**m, "content": m["content"][:room] + " …[cut]"}
+                n = room
+            out.insert(0, m); room -= n
+        elif n <= room:
+            out.insert(0, m); room -= n
+        # else: oversized old turn — dropped
+    return out
+
+
 @app.post("/api/cancel/<req_id>")
 def cancel(req_id):
     # ponytail: checked only between tool-loop iterations; an in-flight LLM call still finishes
@@ -411,8 +429,12 @@ def chat():
     dataset = combined_dataset(body.get("dataset_ids") or [body.get("dataset_id")])
     if dataset is None:
         return jsonify({"error": "Upload a file first"}), 400
-    history = [m for m in body.get("messages", []) if m.get("role") in ("user", "assistant")][-10:]
-    messages = [{"role": "system", "content": system_prompt(dataset)}, *history]
+    sys = system_prompt(dataset)
+    # ~3.5 chars/token; keep history inside what's left of the window after system + reply budget
+    budget = int((CTX_TOKENS - MAX_TOKENS) * 3.5) - len(sys) - 400
+    history = compact_history(
+        [m for m in body.get("messages", []) if m.get("role") in ("user", "assistant")][-10:], budget)
+    messages = [{"role": "system", "content": sys}, *history]
 
     # Streams NDJSON events to the client: status / think / tool / delta / done / error
     def events():

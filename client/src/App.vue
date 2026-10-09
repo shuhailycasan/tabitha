@@ -90,8 +90,25 @@ async function seedSamples() {
   }
 }
 
-function attachToChat(item) {
+// Icons restored from IndexedDB may point at datasets the restarted server forgot —
+// re-upload the stored File so drag-to-chat works again.
+async function reviveStale() {
+  const known = new Set(datasets.state.list.map(d => d.id))
+  for (const item of files.state.items) {
+    if (!item.datasetId || known.has(item.datasetId)) continue
+    item.datasetId = null
+    if (item.file) item.datasetId = await uploadForChat(item.file)
+    files.persist(item)
+  }
+}
+
+async function attachToChat(item) {
   windows.restore('chat')
+  if (item.datasetId && !datasets.state.list.some(d => d.id === item.datasetId)) {
+    // server restarted and forgot it — silently re-upload the stored File
+    item.datasetId = item.file ? await uploadForChat(item.file) : null
+    files.persist(item)
+  }
   if (!item.datasetId) {
     desktop.toast(`Tabitha can't query “${item.name}” — it was never uploaded`)
     return
@@ -104,6 +121,7 @@ onMounted(async () => {
   desktop.start()
   await files.restore() // icons + File objects saved in IndexedDB from previous sessions
   await datasets.refresh()
+  await reviveStale()
   // datasets already on the server get desktop icons too (view needs a local re-open)
   for (const d of datasets.state.list) files.add({ name: d.name, datasetId: d.id })
   seedSamples()
