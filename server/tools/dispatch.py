@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from .sheets import get_col, get_sheet, safe_eval, summarize_col
+from .calculator import safe_eval
+from .sheets import get_col, get_sheet, summarize_col
 from .render import md_table, rows_json
 
 
