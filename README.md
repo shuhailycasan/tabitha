@@ -68,5 +68,6 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "models/MiniCPM5-2B-Q4_K_M.gguf")
 ## Files
 
 - `server/app.py`: Flask API, LLM tool-calling loop, spreadsheet tools
+- `tests/`: pytest suite for the tools layer + upload/run endpoints — `.venv/bin/python -m pytest tests/` (no LLM needed)
 - `client/`: Vue 3 + Vite frontend (`npm run dev` / `npm run build` → `client/dist/`)
 - `client/public/samples/*.xlsx`: example spreadsheets — Bicol University + Divine Word College (regenerate with `scripts/make_samples.py`)

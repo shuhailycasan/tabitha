@@ -1,8 +1,9 @@
 <script setup>
 // Tabitha chat window — streams answers from the backend about the active dataset.
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import OsWindow from './OsWindow.vue'
 import ThinkSprite from './ThinkSprite.vue'
+import MessageChart from './MessageChart.vue'
 import { chat } from '../feature/chat/engine.js'
 import { suggest } from '../feature/chat/commands.js'
 import { datasets } from '../feature/datasets/engine.js'
@@ -49,6 +50,25 @@ function scroll() {
   nextTick(() => { if (log.value) log.value.scrollTop = log.value.scrollHeight })
 }
 watch(() => chat.state.version, scroll)
+
+// processing verbs — a random spreadsheet pun rotates while Tabitha works, instead of bare dots
+const VERBS = ['Excel-ing', 'Spreadsheet-ing', 'Columning', 'Pivoting', 'VLOOKUP-ing',
+  'SUM-ing it up', 'Averaging it out', 'Filtering the noise', 'Sorting it out', 'Charting a course',
+  'Tabulating', 'Counting beans', 'Crunching numbers', 'Summoning cells', 'Auditing cells',
+  'Merging cells (carefully…)', 'Freezing panes', 'Filling down', 'Chasing #REF!s', 'COUNTIF-ing']
+const verb = ref(VERBS[0])
+let verbTimer = null, lastVerb = -1
+function pickVerb() {
+  let i
+  do { i = Math.floor(Math.random() * VERBS.length) } while (i === lastVerb)
+  lastVerb = i
+  verb.value = VERBS[i]
+}
+watch(() => chat.state.sending && !receiving.value, active => {
+  clearInterval(verbTimer)
+  verbTimer = active ? (pickVerb(), setInterval(pickVerb, 1600)) : null
+}, { immediate: true })
+onUnmounted(() => clearInterval(verbTimer))
 
 function send() {
   const text = input.value
@@ -116,6 +136,7 @@ function onKey(e) {
               <summary>Deep Think</summary>
               <div class="think">{{ s.text }}</div>
             </details>
+            <MessageChart v-else-if="s.type === 'chart'" :spec="s.chart" />
             <div v-else class="bubble" v-html="chat.md(s.text)"></div>
           </template>
         </template>
@@ -128,11 +149,12 @@ function onKey(e) {
             <div class="think">{{ m.think }}</div>
           </details>
           <div v-if="m.content" class="bubble" :class="{ user: m.role === 'user' }" v-html="chat.md(m.content)"></div>
+          <MessageChart v-if="m.chart" :spec="m.chart" />
         </template>
       </template>
 
-      <div v-if="chat.state.sending && !receiving" class="bubble typing" aria-label="Tabitha is thinking">
-        <i></i><i></i><i></i>
+      <div v-if="chat.state.sending && !receiving" class="bubble typing" :aria-label="`Tabitha is ${verb}`">
+        <span class="wverb" aria-hidden="true"><span v-for="(ch, ci) in verb" :key="ci" class="wl" :style="{ animationDelay: (ci * 55) + 'ms' }">{{ ch }}</span></span><i></i><i></i><i></i>
       </div>
     </div>
 

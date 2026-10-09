@@ -36,6 +36,9 @@ def est_tokens(messages, with_tools=True):
 def stream_events(req_id, want_think, dataset, messages, dropped):
     """Yields event dicts for the NDJSON stream: status / ctx / compact / think / tool / delta / done / error."""
     tool_log = []
+    prev_calls = None    # (name, args) pairs of the previous round — 2B models loop identical calls
+    loop_repeats = False  # steered once already; a second consecutive repeat gives up
+    nudged = False       # retried once after an empty reply
     try:
         yield {"type": "status", "text": "Thinking…"}
         if dropped:
@@ -95,25 +98,51 @@ def stream_events(req_id, want_think, dataset, messages, dropped):
                 reply = "".join(content)
                 if not reply and finish == "length":
                     reply = "I ran out of thinking space before answering. Try a simpler or more specific question."
+                if not reply and not nudged:
+                    # 2B models sometimes return an empty completion — nudge once and retry
+                    nudged = True
+                    messages.append({"role": "user", "content": "Please answer the question directly in 1-3 sentences."})
+                    continue
+                if not reply:
+                    reply = "I don't have an answer for that. Try rephrasing the question."
                 yield {"type": "done", "reply": reply, "tool_log": tool_log,
                        "ctx": {"tokens": est + int(len(reply or "") / 3.5), "max": CTX_TOKENS}}
                 return
+            sig = [(c["name"], c["args"]) for c in ordered]
+            if sig == prev_calls:
+                # stuck repeating the identical call — steer once, then give up gracefully
+                for c in ordered:
+                    messages.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(
+                        {"error": "Same call repeated — you already have this result. Answer from it now, or use a different tool."})})
+                if loop_repeats:
+                    break
+                loop_repeats = True
+                yield {"type": "status", "text": "Thinking…"}
+                continue
+            loop_repeats = False
+            prev_calls = sig
             for c in ordered:
                 args = {}
                 try:
                     args = json.loads(c["args"] or "{}")
                     result = run_tool(dataset, c["name"], args)
                     entry = {"tool": c["name"], "args": args, "ok": True}
+                except json.JSONDecodeError:
+                    cut = " — they got cut off. Retry with a smaller request." if finish == "length" else "."
+                    result = {"error": f"Tool arguments were not valid JSON{cut}"}
+                    entry = None  # model-recoverable — hidden from the tool chips like Steer
                 except Exception as e:
                     result = {"error": str(e)}
                     entry = None if isinstance(e, Steer) else {"tool": c["name"], "args": args, "ok": False}
                 if entry:
                     tool_log.append(entry)
                     yield {"type": "tool", **entry}
-                messages.append({
-                    "role": "tool", "tool_call_id": c["id"],
-                    "content": json.dumps(result, default=str)[:MAX_TOOL_RESULT_CHARS],
-                })
+                if isinstance(result, dict) and result.get("chart"):
+                    yield {"type": "chart", "chart": result["chart"]}
+                text = json.dumps(result, default=str)
+                if len(text) > MAX_TOOL_RESULT_CHARS:
+                    text = text[:MAX_TOOL_RESULT_CHARS] + " …[truncated]"
+                messages.append({"role": "tool", "tool_call_id": c["id"], "content": text})
             yield {"type": "status", "text": "Thinking…"}
         CANCELLED.discard(req_id)
         yield {"type": "done", "reply": "I could not finish the analysis. Try a simpler question.", "tool_log": tool_log}

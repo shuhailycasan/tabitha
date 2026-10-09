@@ -23,8 +23,9 @@ async function upload(file) {
     const fd = new FormData()
     fd.append('file', file)
     const res = await fetch('/api/upload', { method: 'POST', body: fd })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Upload failed')
+    let data = {}
+    try { data = await res.json() } catch { /* 413 etc. return HTML, not JSON */ }
+    if (!res.ok) throw new Error(data.error || (res.status === 413 ? 'File too large — 25 MB max' : 'Upload failed'))
     state.list.push(data)
     return data  // NB: not attached — the user attaches explicitly
   } catch (e) {

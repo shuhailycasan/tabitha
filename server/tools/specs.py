@@ -54,7 +54,7 @@ TOOLS = [
     _fn("bar_chart",
         "Draw a bar chart. Numeric 'column' -> top-N bars per row. 'by' alone or op 'count' -> count rows per "
         "category (e.g. how many Present vs Absent). 'by' + 'column' + op avg/sum/min/max -> aggregate per group. "
-        "Returns a ready-made chart — paste it into your answer exactly as given, keep the | pipes. "
+        "The chart is drawn for the user automatically — do NOT paste any table or bars into your answer, just say what it shows. "
         "Use for: bar graph, chart, plot, visualize, count per category, average per group, compare values as bars.",
         {"sheet": _SHEET,
          "column": {**_COL, "description": "Numeric column for bar heights. Omit for a count-per-'by' chart."},
@@ -64,6 +64,10 @@ TOOLS = [
          "n": {"type": "integer", "description": "How many bars (default 15, max 25)"},
          "ascending": _ASC},
         ["sheet"]),
+    _fn("list_sheets",
+        "List the sheets in the loaded file(s) with row counts and column names. "
+        "Use for: what sheets are there, what data do we have, which sheet has X, show the structure.",
+        {}, []),
     _fn("lookup",
         "Everything about one person/item: finds rows matching a name in EVERY sheet. "
         "Use for: how is Liam doing, tell me about Ana, Gia's grades and attendance.",

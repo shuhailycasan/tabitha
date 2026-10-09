@@ -46,6 +46,9 @@ def get_col(df, name):
     hits = [c for c in cols if norm(c) == norm(name)] or [c for c in cols if norm(name) in norm(c)]
     if len(hits) == 1:
         return hits[0]
+    if len(hits) > 1:
+        # several candidates — a small model recovers instantly from an explicit list
+        raise ValueError(f"Ambiguous column '{name}' — pick one exactly: {hits}")
     raise ValueError(f"Unknown column '{name}'. Columns: {cols}")
 
 

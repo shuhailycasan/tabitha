@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
+from werkzeug.utils import secure_filename
 
 from chat import compact_history, stream_events
 from config import AUTO_COMPACT, CLIENT_DIR, CTX_TOKENS, HOST, LLM_MODEL, PORT, UPLOAD_DIR
@@ -12,6 +13,7 @@ from tools import TOOLS_CHARS, md_result, run_tool
 
 # static_url_path="" serves dist/assets/... at the root-absolute paths Vite emits
 app = Flask(__name__, static_folder=str(CLIENT_DIR), static_url_path="")
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 25 MB — gradebooks are small; huge uploads only stall the LLM
 
 
 @app.get("/")
@@ -29,18 +31,19 @@ def upload():
     f = request.files.get("file")
     if not f or not f.filename:
         return jsonify({"error": "No file provided"}), 400
-    ext = Path(f.filename).suffix.lower()
-    if ext not in (".xlsx", ".xls", ".csv"):
+    filename = secure_filename(f.filename)  # strips path parts — a crafted name can't write outside uploads/
+    ext = Path(filename).suffix.lower()
+    if ext not in (".xlsx", ".csv"):
         return jsonify({"error": "Upload a .xlsx or .csv file"}), 400
-    path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{f.filename}"
+    path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{filename}"
     f.save(path)
     try:
-        sheets = load_sheets(path, f.filename)
+        sheets = load_sheets(path, filename)
     except Exception as e:
         path.unlink(missing_ok=True)
         return jsonify({"error": f"Could not read file: {e}"}), 400
     ds_id = uuid.uuid4().hex[:12]
-    DATASETS[ds_id] = {"name": f.filename, "sheets": sheets}
+    DATASETS[ds_id] = {"name": filename, "sheets": sheets, "path": path}
     return jsonify(dataset_info(ds_id))
 
 
@@ -51,7 +54,9 @@ def datasets():
 
 @app.delete("/api/datasets/<ds_id>")
 def delete_dataset(ds_id):
-    DATASETS.pop(ds_id, None)
+    ds = DATASETS.pop(ds_id, None)
+    if ds and ds.get("path"):
+        Path(ds["path"]).unlink(missing_ok=True)  # don't let uploads/ fill with orphaned files
     return jsonify({"ok": True})
 
 
@@ -66,7 +71,8 @@ def api_run():
         result = run_tool(dataset, body.get("tool", ""), body.get("args") or {})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
-    return jsonify({"ok": True, "text": md_result(result)})
+    return jsonify({"ok": True, "text": md_result(result),
+                    "chart": result.get("chart") if isinstance(result, dict) else None})
 
 
 @app.post("/api/cancel/<req_id>")

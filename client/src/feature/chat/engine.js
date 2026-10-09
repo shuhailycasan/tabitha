@@ -62,6 +62,7 @@ async function command(text) {
     state.messages.push({
       role: 'assistant', content: data.ok ? data.text : `Error: ${data.error}`,
       tool_log: [{ tool: c.tool, args: c.args, ok: !!data.ok }],
+      chart: data.chart || null,
     })
   } catch (e) {
     state.error = e.message + ' — try again.'
@@ -148,6 +149,7 @@ async function send(text) {
           pending.tool_log.push(e)
           pending.segments.push({ type: 'tool', tool: e.tool, args: e.args, ok: e.ok })
         }
+        else if (e.type === 'chart') pending.segments.push({ type: 'chart', chart: e.chart })
         else if (e.type === 'delta') {
           pending.content += e.text
           const last = pending.segments.at(-1)

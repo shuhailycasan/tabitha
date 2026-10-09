@@ -232,8 +232,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .bubble:has(.tablewrap) { max-width: 100%; }
 .bubble.typing { display: flex; gap: 4px; align-items: center; padding: 12px; }
 .bubble.typing i { width: 5px; height: 5px; border-radius: 50%; background: #7a9a7d; animation: dot 1s ease-in-out infinite; }
-.bubble.typing i:nth-child(2) { animation-delay: .15s; }
-.bubble.typing i:nth-child(3) { animation-delay: .3s; }
+.bubble.typing i:nth-of-type(2) { animation-delay: .15s; }
+.bubble.typing i:nth-of-type(3) { animation-delay: .3s; }
+/* processing verb: gradient letters rippling in a wave, Claude-Code-style */
+.bubble.typing .wverb { white-space: pre; font-weight: 650; }
+.bubble.typing .wl {
+  display: inline-block; animation: wv 1.2s ease-in-out infinite;
+  background: linear-gradient(135deg, #2f7d44, #4ade80);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+@keyframes wv { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-3px) scale(1.18); } }
 
 .toolchip {
   align-self: flex-start; font-size: 11px; color: var(--muted);
@@ -253,6 +261,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .tablewrap th, .tablewrap td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; white-space: nowrap; }
 .tablewrap th { background: var(--green-soft); color: var(--green); font-weight: 650; }
 .tablewrap tbody tr:nth-child(even) { background: #f7faf6; }
+.chartbox {
+  align-self: stretch; padding: 10px 12px;
+  background: white; border: 1px solid var(--line); border-radius: 10px;
+}
+.chart-canvas { position: relative; }
+.chart-note { margin-top: 4px; font-size: 10px; color: var(--muted); text-align: right; }
 
 .alert {
   flex: none; margin: 0 10px; background: #fef2f2; color: #b3251e;

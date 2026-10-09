@@ -13,8 +13,8 @@ MAX_TOOL_RESULT_CHARS = 4000  # keep results small; the model has 16384 tokens p
 CTX_TOKENS = int(os.environ.get("CTX_TOKENS", "16384"))  # must match llama-server's per-slot ctx (-c / -np)
 MAX_TOKENS = 4096  # reasoning model: ~2500 tokens of thinking before a tool call; 1024 truncated to nothing
 AUTO_COMPACT = 0.60  # drop oldest history once the prompt would exceed 60% of the window
-THINK_BUDGET = int(os.environ.get("THINK_BUDGET", "170"))  # llama.cpp reasoning_budget — ~170 tok ≈ ~500 chars of thinking
-THINK_MAX_CHARS = int(os.environ.get("THINK_MAX_CHARS", "500"))  # hard cap on the thinking text shown in the UI
+THINK_BUDGET = int(os.environ.get("THINK_BUDGET", "500"))  # llama.cpp reasoning_budget — ~500 tok ≈ ~1500 chars of thinking
+THINK_MAX_CHARS = int(os.environ.get("THINK_MAX_CHARS", "1500"))  # hard cap on the thinking text shown in the UI
 
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "2424"))  # 5000 reserved, 8000 in use
