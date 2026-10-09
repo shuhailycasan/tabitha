@@ -1,6 +1,6 @@
-# tabitha
-
 ![Tabitha — Chat with your spreadsheets](readmesrc/banner.png)
+
+# Tabitha
 
 Chat with your Excel gradebooks, attendance and test sheets in plain English, powered by a local LLM.
 
