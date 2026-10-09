@@ -61,6 +61,25 @@ flowchart LR
 - **`vendor/llama/`** — bundled `llama-server` binaries (not committed; `start.sh` fetches the official release if absent).
 - **`models/`** — the GGUF weights (not committed; downloaded from GitHub Releases by `start.sh`).
 
+### Server request flow
+
+How a file and a question travel through the Flask backend:
+
+```mermaid
+flowchart TD
+    U["POST /api/upload<br>.xlsx / .csv"] --> L["load_sheets()<br>each sheet → pandas DataFrame"]
+    L --> DS[("DATASETS<br>in-memory store")]
+    C["POST /api/chat<br>messages · dataset_ids · think"] --> CD["combined_dataset(ids)<br>pool sheets from all files<br>(clashes get a [file] suffix)"]
+    DS --> CD
+    CD --> SP["system_prompt(dataset)<br>live column + sheet stats"]
+    CD --> CH["compact_history()<br>drop oldest turns past 60% ctx"]
+    SP --> SE["stream_events()<br>agentic tool loop"]
+    CH --> SE
+    SE ==>|"status · ctx · think · tool · delta · chart · done"| UI["NDJSON → client"]
+    R["POST /api/run<br>/commands — no LLM"] --> RT["run_tool()"]
+    RT --> MD["md_result() → JSON → client"]
+```
+
 ## The model
 
 | | |
@@ -81,10 +100,36 @@ Tabitha isn't a one-shot prompt — the backend runs an agent loop (`server/chat
 - **Tool calling.** The model calls spreadsheet tools (below), sees the real results, and answers — up to 8 tool rounds per question.
 - **Streaming transcript.** Every step is an NDJSON event (`status`, `ctx`, `compact`, `think`, `tool`, `delta`, `chart`, `done`, `error`), so the UI shows reasoning, tool chips, and text as they happen.
 - **Deep Think.** Optional chain-of-thought (`enable_thinking` + `reasoning_budget`), shown in a collapsible box. Off by default — roughly 4× faster.
-- **Multi-file scope.** Attach several files or `@mention` them per message; the backend merges sheets on a shared first column into one dataset.
+- **Multi-file scope.** Attach several files or `@mention` them per message; their sheets are pooled into one virtual dataset, and the magic sheet `"all"` outer-merges every sheet sharing a first column.
 - **Auto-compaction.** When the prompt would exceed 60% of the context window, the oldest turns are dropped and the user is told.
 - **Interruption.** Stop button or Enter-twice cancels mid-stream (`/api/cancel/<req_id>`), keeping whatever already streamed.
 - **Per-turn timer.** Each reply shows live elapsed time while it generates and the total once done.
+
+### The tool loop
+
+```mermaid
+sequenceDiagram
+    participant UI as Client (Vue)
+    participant F as Flask · /api/chat
+    participant L as llama-server · MiniCPM5-2B
+    participant T as run_tool() · pandas
+
+    UI->>F: POST /api/chat (messages, dataset_ids, think)
+    F->>F: system prompt + compact history (≤60% ctx)
+    loop up to 8 rounds
+        F->>L: chat.completions (stream + tool defs)
+        L-->>UI: think / delta → NDJSON to client
+        L-->>F: finish with tool_call(s)
+        F-->>UI: tool chip event
+        F->>T: run_tool(name, args)
+        T-->>F: rows / stats / chart / error
+        F-->>UI: chart event (if any)
+        Note over F,L: results appended → next round
+    end
+    F-->>UI: done (reply + ctx usage)
+```
+
+Identical repeated calls are steered back once ("you already have this result"), then the loop gives up gracefully — a known 2B failure mode. `Steer` errors reach the model but never the user's tool chips.
 
 ## Tools
 
