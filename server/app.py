@@ -12,10 +12,12 @@ LLM_BASE_URL = "http://192.168.0.159:2828/v1"
 LLM_MODEL = "models/MiniCPM5-2B-Q4_K_M.gguf"
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+CLIENT_DIR = Path(__file__).parent.parent / "client"
 MAX_TOOL_RESULT_CHARS = 4000  # keep results small; the model has 8192 tokens total
 MAX_TOKENS = 4096  # reasoning model: ~2500 tokens of thinking before a tool call; 1024 truncated to nothing
 
-app = Flask(__name__)
+# static_url_path stays /static so the client's <script src="/static/vendor/..."> keeps working
+app = Flask(__name__, static_folder=str(CLIENT_DIR), static_url_path="/static")
 llm = OpenAI(base_url=LLM_BASE_URL, api_key="none", timeout=300.0, max_retries=0)
 
 # ponytail: in-memory store keyed by dataset id, single process; switch to sqlite if sessions must survive restarts

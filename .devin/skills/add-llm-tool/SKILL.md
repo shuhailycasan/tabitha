@@ -24,7 +24,7 @@ Reuse the helpers:
 
 - `get_sheet(dataset, name)` — case-insensitive; falls back to the only sheet. Never index `dataset["sheets"][name]` directly.
 - `get_col(df, name)` — exact / case+space-insensitive / unique-substring match; raises `ValueError` listing columns.
-- `md_table(df, total)` — ready-made markdown table string. For "show/list/table" style output return this and tell the prompt to paste it verbatim (a 2B model copies a table far better than it builds one from JSON). The UI's `md()` in `static/index.html` renders `**bold**` and `| tables |` only.
+- `md_table(df, total)` — ready-made markdown table string. For "show/list/table" style output return this and tell the prompt to paste it verbatim (a 2B model copies a table far better than it builds one from JSON). The UI's `md()` in `client/index.html` renders `**bold**` and `| tables |` only.
 - `rows_json(df, limit)` — rows output, capped at 100. `holders(df, col, value)` — names of who holds a value.
 - Return answer-ready dicts (counts, who, mean) so the model needs ONE call, not a chain. Raise `ValueError` for bad input — the route feeds it back as a tool result.
 
@@ -37,7 +37,7 @@ Reuse the helpers:
 
 ## 4. Verify
 
-Run `python bench.py` (thinking on) and `python bench.py fast` against a running server: 6 questions with expected answers, prints rounds / thinking tokens / tools used / pass-fail. Add a case to `CASES` for your new tool. Baseline: 6/6, ~84s avg thinking, ~24s fast, 2 rounds.
+Run `python server/bench.py` (thinking on) and `python server/bench.py fast` against a running server: 6 questions with expected answers, prints rounds / thinking tokens / tools used / pass-fail. Add a case to `CASES` for your new tool. Baseline: 6/6, ~84s avg thinking, ~24s fast, 2 rounds.
 
 Manual: 
-Follow the `run-and-verify` skill: restart, **re-upload `sample_grades.xlsx`** (in-memory store dies on reload), ask a question that needs the new tool, check `tool_log` shows `"ok":true`. If it shows `ok:false`, read the `error` in the tool result — the model saw the same message.
+Follow the `run-and-verify` skill: restart, **re-upload `data/sample_grades.xlsx`** (in-memory store dies on reload), ask a question that needs the new tool, check `tool_log` shows `"ok":true`. If it shows `ok:false`, read the `error` in the tool result — the model saw the same message.
