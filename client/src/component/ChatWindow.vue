@@ -4,6 +4,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import OsWindow from './OsWindow.vue'
 import ThinkSprite from './ThinkSprite.vue'
 import { chat } from '../feature/chat/engine.js'
+import { suggest } from '../feature/chat/commands.js'
 import { datasets } from '../feature/datasets/engine.js'
 import { files } from '../feature/files/engine.js'
 import { spreadsheet } from '../feature/spreadsheet/engine.js'
@@ -67,7 +68,33 @@ function send() {
   const text = input.value
   if (!text.trim()) return
   input.value = ''
-  chat.send(text, dataset.value?.id)
+  ac.value = null
+  chat.send(text)
+}
+
+// @file / /command suggestions (logic in feature/chat/commands.js)
+const ta = ref(null)
+const ac = ref(null)
+function onInput(e) {
+  ac.value = suggest(input.value, e.target.selectionStart, datasets.state.activeId, datasets.state.list)
+}
+function pick(item) {
+  const a = ac.value
+  input.value = input.value.slice(0, a.tokenStart) + item.label + ' ' + input.value.slice(a.pos)
+  const p = a.tokenStart + item.label.length + 1
+  ac.value = null
+  nextTick(() => { ta.value.focus(); ta.value.setSelectionRange(p, p); onInput({ target: ta.value }) }) // chain: "/top " -> columns
+}
+function onKey(e) {
+  const a = ac.value
+  if (a) {
+    const n = a.items.length
+    if (e.key === 'ArrowDown') { a.i = (a.i + 1) % n; return e.preventDefault() }
+    if (e.key === 'ArrowUp') { a.i = (a.i - 1 + n) % n; return e.preventDefault() }
+    if (e.key === 'Enter' || e.key === 'Tab') { pick(a.items[a.i]); return e.preventDefault() }
+    if (e.key === 'Escape') { ac.value = null; return }
+  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
 }
 </script>
 
@@ -138,11 +165,17 @@ function send() {
         <button aria-label="Detach file" title="Detach file" @click="datasets.state.activeId = null">×</button>
       </div>
       <div class="compose-box">
-        <textarea v-model="input" rows="2"
-                  :placeholder="dataset ? 'Ask Tabitha about your spreadsheet…' : 'Open a spreadsheet first'"
+        <div v-if="ac" class="ac" role="listbox">
+          <button v-for="(it, i) in ac.items" :key="it.label" type="button" role="option"
+                  :class="{ on: i === ac.i }" @mousedown.prevent="pick(it)">
+            <span>{{ it.label }}</span><small>{{ it.hint }}</small>
+          </button>
+        </div>
+        <textarea ref="ta" v-model="input" rows="2"
+                  :placeholder="dataset ? 'Ask Tabitha… (@file to combine, / for commands)' : 'Open a spreadsheet first'"
                   :disabled="!dataset || chat.state.sending"
                   aria-label="Ask Tabitha about your spreadsheet"
-                  @keydown.enter.exact.prevent="send"></textarea>
+                  @input="onInput" @keydown="onKey"></textarea>
         <button v-if="chat.state.sending" class="send cancel" aria-label="Stop" @click="chat.cancel()">■</button>
         <button v-else class="send" aria-label="Send message" :disabled="!dataset || !input.trim()" @click="send">↑</button>
       </div>

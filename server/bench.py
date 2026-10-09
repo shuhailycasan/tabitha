@@ -21,12 +21,17 @@ CASES = [  # (question, substrings that must all appear in the reply)
     ("Which students scored above 90 in Science?", ["Ben", "Dan", "Gia", "Ivy", "Kim", "Liam"]),
     ("List the students in a markdown table", ["| Student", "---", "| Ana", "| Olga"]),
 ]
+XCASES = [  # cross-file questions — run with: python bench.py x  (uses grades + attendance)
+    ("Who has the highest Math score and how many days were they absent?", ["Fred", "98", "9"]),
+    ("Do students with Math below 70 miss class more? Give the average days absent for them.", ["13.4"]),
+    ("List Ana's grades and attendance in a table", ["Ana", "68", "12"]),
+]
 
 
 def run(case):
     q, must = case
     t0, rounds, think, tools, reply = time.time(), 0, 0, [], ""
-    body = json.dumps({"dataset_id": DS, "request_id": f"bench{time.time_ns()}", "think": THINK, "messages": [{"role": "user", "content": q}]}).encode()
+    body = json.dumps({"dataset_ids": IDS, "request_id": f"bench{time.time_ns()}", "think": THINK, "messages": [{"role": "user", "content": q}]}).encode()
     req = urllib.request.Request(f"{BASE}/api/chat", body, {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=900) as r:
         lines = [l.decode() for l in r]
@@ -44,8 +49,12 @@ def run(case):
 
 if __name__ == "__main__":
     DS = json.loads(subprocess.check_output(["curl", "-s", "-F", f"file=@{SAMPLE}", f"{BASE}/api/upload"]))["id"]
+    IDS, cases = [DS], CASES
+    if "x" in sys.argv:  # cross-file mode
+        DS2 = json.loads(subprocess.check_output(["curl", "-s", "-F", f"file=@{SAMPLE.parent}/sample_attendance.xlsx", f"{BASE}/api/upload"]))["id"]
+        IDS, cases = [DS, DS2], XCASES
     with ThreadPoolExecutor(3) as ex:
-        res = list(ex.map(run, CASES))
+        res = list(ex.map(run, cases))
     for x in res:
         print(("PASS" if x["ok"] else "FAIL"), f'{x["secs"]}s rounds={x["rounds"]} think={x["think"]} tools={x["tools"]}\n   Q: {x["q"]}\n   A: {x["reply"]}')
     print(f'\n{sum(x["ok"] for x in res)}/{len(res)} correct | avg {sum(x["secs"] for x in res)//len(res)}s | avg think tokens {sum(x["think"] for x in res)//len(res)} | avg rounds {sum(x["rounds"] for x in res)/len(res):.1f}')

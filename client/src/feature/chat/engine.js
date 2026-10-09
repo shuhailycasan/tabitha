@@ -1,6 +1,8 @@
 // chat engine — talks to the backend's NDJSON stream (/api/chat) and tracks message state.
 // Events handled: status / think / tool / delta / done / error. Cancel via /api/cancel/<id>.
 import { reactive, readonly } from 'vue'
+import { datasets } from '../datasets/engine.js'
+import { COMMANDS, scopeIds, cleanMentions, parseCommand } from './commands.js'
 
 const state = reactive({
   messages: [],        // { role, content, think?, tool_log? }
@@ -26,9 +28,44 @@ function pushAssistant(text) {
   bump()
 }
 
-async function send(text, datasetId) {
+// /commands run backend tools directly (POST /api/run) — instant, no LLM
+async function command(text) {
+  const { activeId, list } = datasets.state
+  const c = parseCommand(text, activeId, list)
+  state.error = ''
+  if (c.local === 'clear') return reset()
+  if (c.local === 'fast') { state.thinkEnabled = false; return pushAssistant('Fast mode on — answers skip the thinking step.') }
+  if (c.local === 'think') { state.thinkEnabled = true; return pushAssistant('Thinking mode on — slower, shows reasoning.') }
+  if (c.local === 'help') {
+    return pushAssistant(COMMANDS.map(x => `**${x.label}** — ${x.hint}`).join('\n') + '\n\nTip: @file adds another uploaded file to your question.')
+  }
+  if (c.error) return pushAssistant(c.error)
+  state.messages.push({ role: 'user', content: text })
+  bump()
+  try {
+    const res = await fetch('/api/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataset_ids: c.ids, tool: c.tool, args: c.args }),
+    })
+    const data = await res.json()
+    state.messages.push({
+      role: 'assistant', content: data.ok ? data.text : `Error: ${data.error}`,
+      tool_log: [{ tool: c.tool, args: c.args, ok: !!data.ok }],
+    })
+  } catch (e) {
+    state.error = e.message + ' — try again.'
+  }
+  bump()
+}
+
+async function send(text) {
   text = (text || '').trim()
-  if (!text || !datasetId || state.sending) return
+  if (!text || state.sending) return
+  if (text.startsWith('/')) return command(text)
+  const { activeId, list } = datasets.state
+  const ids = scopeIds(text, activeId, list)
+  if (!ids.length) return
+  const clean = cleanMentions(text, list)
 
   state.error = ''
   state.sending = true
@@ -47,11 +84,11 @@ async function send(text, datasetId) {
       headers: { 'Content-Type': 'application/json' },
       signal: abortCtrl.signal,
       body: JSON.stringify({
-        dataset_id: datasetId,
+        dataset_ids: ids,
         request_id: reqId,
         think: state.thinkEnabled,
-        messages: state.messages.filter(m => m !== pending)
-          .map(m => ({ role: m.role, content: m.content })),
+        messages: [...state.messages.filter(m => m !== pending).map(m => ({ role: m.role, content: m.content })).slice(0, -1),
+          { role: 'user', content: clean }], // the model sees @file as a quoted file name, the chat shows what was typed
       }),
     })
     if (!res.ok) {

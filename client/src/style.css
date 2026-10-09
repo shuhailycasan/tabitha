@@ -338,3 +338,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition: none !important; }
 }
+
+/* @file and /command suggestions above the composer */
+.compose-box { position: relative; }
+.ac {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 20; min-width: 260px; max-width: 100%;
+  max-height: 220px; overflow-y: auto; background: white; border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+.ac button {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px; width: 100%;
+  border: 0; background: none; padding: 7px 11px; text-align: left; font-size: 12px; color: var(--ink); cursor: pointer;
+}
+.ac button.on, .ac button:hover { background: var(--green-soft); }
+.ac small { color: var(--muted); font-size: 11px; text-align: right; }
