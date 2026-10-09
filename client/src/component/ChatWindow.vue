@@ -70,6 +70,31 @@ watch(() => chat.state.sending && !receiving.value, active => {
 }, { immediate: true })
 onUnmounted(() => clearInterval(verbTimer))
 
+// per-turn timer — ticks while a reply streams, then freezes at the final duration
+const now = ref(0)
+let clock = null
+watch(() => chat.state.sending, s => {
+  clearInterval(clock)
+  clock = s ? (now.value = performance.now(), setInterval(() => { now.value = performance.now() }, 200)) : null
+}, { immediate: true })
+onUnmounted(() => clearInterval(clock))
+
+function fmtElapsed(ms) {
+  if (ms == null || ms < 0) return ''
+  const s = ms / 1000
+  if (s < 60) return (s < 10 ? s.toFixed(1) : Math.round(s)) + 's'
+  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`
+}
+const lastIdx = computed(() => chat.state.messages.length - 1)
+// live elapsed for the in-flight reply; final "took Xs" once done (pre-text phase shows it in the typing bubble)
+function msgTime(m, i) {
+  if (m.role !== 'assistant') return null
+  if (i === lastIdx.value && chat.state.sending) return receiving.value ? fmtElapsed(now.value - (m.t0 ?? now.value)) : null
+  return m.elapsed != null ? fmtElapsed(m.elapsed) : null
+}
+const liveElapsed = computed(() =>
+  pendingMsg.value?.t0 != null ? fmtElapsed(now.value - pendingMsg.value.t0) : '')
+
 function send() {
   const text = input.value
   if (!text.trim()) return
@@ -151,10 +176,12 @@ function onKey(e) {
           <div v-if="m.content" class="bubble" :class="{ user: m.role === 'user' }" v-html="chat.md(m.content)"></div>
           <MessageChart v-if="m.chart" :spec="m.chart" />
         </template>
+        <div v-if="msgTime(m, i)" class="msg-time" :class="{ live: i === lastIdx && chat.state.sending }">⏱ {{ msgTime(m, i) }}</div>
       </template>
 
       <div v-if="chat.state.sending && !receiving" class="bubble typing" :aria-label="`Tabitha is ${verb}`">
         <span class="wverb" aria-hidden="true"><span v-for="(ch, ci) in verb" :key="ci" class="wl" :style="{ animationDelay: (ci * 55) + 'ms' }">{{ ch }}</span></span><i></i><i></i><i></i>
+        <span v-if="liveElapsed" class="ttime">⏱ {{ liveElapsed }}</span>
       </div>
     </div>
 

@@ -53,6 +53,7 @@ async function command(text) {
   if (c.error) return pushAssistant(c.error)
   state.messages.push({ role: 'user', content: text })
   bump()
+  const t0 = performance.now()
   try {
     const res = await fetch('/api/run', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -63,6 +64,7 @@ async function command(text) {
       role: 'assistant', content: data.ok ? data.text : `Error: ${data.error}`,
       tool_log: [{ tool: c.tool, args: c.args, ok: !!data.ok }],
       chart: data.chart || null,
+      elapsed: performance.now() - t0,
     })
   } catch (e) {
     state.error = e.message + ' — try again.'
@@ -96,7 +98,7 @@ async function send(text) {
 
   state.messages.push({ role: 'user', content: text })
   // segments: chronological think/tool/text pieces of this reply (Claude-style transcript)
-  state.messages.push({ role: 'assistant', content: '', tool_log: [], think: '', segments: [] })
+  state.messages.push({ role: 'assistant', content: '', tool_log: [], think: '', segments: [], t0: performance.now(), elapsed: null })
   const pending = state.messages[state.messages.length - 1]
   bump()
 
@@ -185,6 +187,7 @@ async function send(text) {
     }
   }
 
+  pending.elapsed = performance.now() - pending.t0
   // an interrupt replaces abortCtrl mid-flight — only the owner may clear the busy flag
   const mine = abortCtrl === myCtrl
   if (mine) { state.sending = false; abortCtrl = null }

@@ -305,6 +305,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .ctxbar-track i { display: block; height: 100%; border-radius: 3px; background: var(--green-2); transition: width .3s; }
 .ctxbar-track i.hot { background: #d08700; }
 .ctx-note { align-self: center; font-size: 10px; color: var(--muted); padding: 1px 10px; border: 1px solid var(--line); border-radius: 999px; background: #f7f9f6; }
+.msg-time { align-self: flex-start; margin-top: -4px; font-size: 9px; color: #a7b0a6; font-variant-numeric: tabular-nums; }
+.msg-time.live { color: var(--green-2); }
+.bubble.typing .ttime { margin-left: 5px; font-size: 10px; color: #a7b0a6; font-variant-numeric: tabular-nums; }
 
 /* ---- dock + toast ---- */
 .dock {
