@@ -28,6 +28,8 @@ def md_result(result):
     if isinstance(result, dict):
         if "table" in result:
             return result["table"]
+        if "chart" in result:
+            return result["chart"]
         if isinstance(result.get("rows"), list) and result["rows"] and isinstance(result["rows"][0], dict):
             head = f"**{result['matches']} match(es)**\n\n" if "matches" in result else ""
             return head + table(result["rows"])

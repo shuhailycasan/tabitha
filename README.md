@@ -2,7 +2,7 @@
 
 # Tabitha
 
-Chat with your Excel gradebooks, attendance and test sheets in plain English, powered by a local LLM.
+Chat with your Excel gradebooks, attendance and test sheets in plain English, powered by a local LLM — [MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) (Q4_K_M GGUF) running on llama.cpp.
 
 Flask backend (`server/app.py`) + a Vue 3 / Vite frontend (`client/`). The LLM calls tools on the uploaded spreadsheet, so answers come from the actual data.
 
@@ -14,7 +14,7 @@ Requirements: Python 3.10+, Node.js 20+, curl. Linux x86_64 and macOS (arm64/x86
 ./start.sh
 ```
 
-First run downloads the model (~1.5 GB) from the repo's GitHub Releases into `models/` (verified by sha256), installs deps, builds the client, starts `llama-server` on `127.0.0.1:2828`, then serves the app at http://localhost:2424. Later runs skip everything that's already done. Upload a `.xlsx` (try `client/public/samples/sample_grades.xlsx`) and start asking questions.
+First run downloads the model (~1.5 GB) from the repo's GitHub Releases into `models/` (verified by sha256), installs deps, builds the client, starts `llama-server` on `127.0.0.1:2828`, then serves the app at http://localhost:2424. Later runs skip everything that's already done. Upload a `.xlsx` (try `client/public/samples/bicol_university_grades.xlsx`) and start asking questions.
 
 `llama-server` (llama.cpp b11527) is vendored under `vendor/llama/` for offline dev; if it's not there (e.g. `vendor/` is gitignored on a fresh clone), `start.sh` downloads the official binary for your platform automatically.
 
@@ -58,7 +58,7 @@ For production, `npm run build` emits `client/dist/`, which Flask serves at http
 
 ## LLM server
 
-`start.sh` runs the vendored `llama-server` (llama.cpp b11527) on `127.0.0.1:2828` with the downloaded model. To point at a different server or model, use env vars — `server/app.py` reads:
+`start.sh` runs the vendored `llama-server` (llama.cpp b11527) on `127.0.0.1:2828` with [MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) (`MiniCPM5-2B-Q4_K_M.gguf`, ~1.5 GB). To point at a different server or model, use env vars — `server/app.py` reads:
 
 ```python
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:2828/v1")
@@ -68,6 +68,5 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "models/MiniCPM5-2B-Q4_K_M.gguf")
 ## Files
 
 - `server/app.py`: Flask API, LLM tool-calling loop, spreadsheet tools
-- `server/bench.py`: quick benchmark script
 - `client/`: Vue 3 + Vite frontend (`npm run dev` / `npm run build` → `client/dist/`)
-- `client/public/samples/sample_*.xlsx`: example spreadsheets
+- `client/public/samples/*.xlsx`: example spreadsheets — Bicol University + Divine Word College (regenerate with `scripts/make_samples.py`)

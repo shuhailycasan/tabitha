@@ -15,9 +15,8 @@ const emit = defineEmits(['upload'])
       <button class="upload-excel" @click="emit('upload')">↑ Upload Excel</button>
     </div>
     <div class="top-right">
-      <span class="top-state"><i class="online-dot"></i>Local mode</span>
       <span class="clock">{{ desktop.state.clock }}</span>
-      <button class="top-menu" aria-label="System menu" @click="desktop.toast('Tabitha Desktop · local mode')">⋮</button>
+      <button class="top-menu" aria-label="System menu" @click="desktop.toast('Tabitha Desktop')">⋮</button>
     </div>
   </header>
 </template>

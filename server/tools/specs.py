@@ -51,6 +51,16 @@ TOOLS = [
          "op": {"type": "string", "enum": ["sum", "avg", "min", "max", "count"], "description": "Default sum"},
          "ascending": _ASC},
         ["sheet", "by"]),
+    _fn("bar_chart",
+        "Draw a bar chart of one numeric column (top N rows, sorted). Labels come from 'by' or the first column. "
+        "Returns a ready-made chart — paste it into your answer exactly as given, keep the | pipes. "
+        "Use for: bar graph, chart, plot, visualize, graph the scores/values, compare values as bars.",
+        {"sheet": _SHEET,
+         "column": {**_COL, "description": "Numeric column for the bar heights"},
+         "by": {**_COL, "description": "Optional label column for each bar. Omit for the first column (usually names)."},
+         "n": {"type": "integer", "description": "How many bars (default 15, max 25)"},
+         "ascending": _ASC},
+        ["sheet", "column"]),
     _fn("lookup",
         "Everything about one person/item: finds rows matching a name in EVERY sheet. "
         "Use for: how is Liam doing, tell me about Ana, Gia's grades and attendance.",

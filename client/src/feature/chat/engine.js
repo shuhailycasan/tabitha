@@ -94,7 +94,8 @@ async function send(text) {
   reqId = crypto.randomUUID()
 
   state.messages.push({ role: 'user', content: text })
-  state.messages.push({ role: 'assistant', content: '', tool_log: [], think: '' })
+  // segments: chronological think/tool/text pieces of this reply (Claude-style transcript)
+  state.messages.push({ role: 'assistant', content: '', tool_log: [], think: '', segments: [] })
   const pending = state.messages[state.messages.length - 1]
   bump()
 
@@ -137,11 +138,29 @@ async function send(text) {
           state.messages.splice(j < 0 ? state.messages.length : j, 0,
             { role: 'note', content: `Context compacted — ${e.dropped} earlier message(s) dropped` })
         }
-        else if (e.type === 'think') pending.think += e.text
-        else if (e.type === 'tool') pending.tool_log.push(e)
-        else if (e.type === 'delta') pending.content += e.text
+        else if (e.type === 'think') {
+          pending.think += e.text
+          const last = pending.segments.at(-1)
+          if (last?.type === 'think') last.text += e.text
+          else pending.segments.push({ type: 'think', text: e.text })
+        }
+        else if (e.type === 'tool') {
+          pending.tool_log.push(e)
+          pending.segments.push({ type: 'tool', tool: e.tool, args: e.args, ok: e.ok })
+        }
+        else if (e.type === 'delta') {
+          pending.content += e.text
+          const last = pending.segments.at(-1)
+          if (last?.type === 'text') last.text += e.text
+          else pending.segments.push({ type: 'text', text: e.text })
+        }
         else if (e.type === 'done') {
           pending.content = e.reply || pending.content
+          if (e.reply) {  // reply = final round's text — replace/append the trailing text segment
+            const last = pending.segments.at(-1)
+            if (last?.type === 'text') last.text = e.reply
+            else pending.segments.push({ type: 'text', text: e.reply })
+          }
           if (e.ctx) state.ctx = e.ctx
         }
         else if (e.type === 'error') throw new Error(e.error)
@@ -152,7 +171,12 @@ async function send(text) {
     const idx = state.messages.indexOf(pending)
     if (e.name === 'AbortError') {
       // interrupted — keep whatever streamed in, marked as stopped
-      if (idx >= 0) pending.content = pending.content ? pending.content.trimEnd() + '\n\n(stopped)' : '(stopped)'
+      if (idx >= 0) {
+        pending.content = pending.content ? pending.content.trimEnd() + '\n\n(stopped)' : '(stopped)'
+        const last = pending.segments?.at(-1)
+        if (last?.type === 'text') last.text += '\n\n(stopped)'
+        else pending.segments?.push({ type: 'text', text: '(stopped)' })
+      }
     } else {
       if (idx >= 0) state.messages.splice(idx, 1)
       state.error = e.message + ' — try again.'

@@ -18,24 +18,31 @@ const pendingMsg = computed(() => {
   const m = chat.state.messages[chat.state.messages.length - 1]
   return m && m.role === 'assistant' ? m : null
 })
-const receiving = computed(() => !!(pendingMsg.value && pendingMsg.value.content))
+// reply is "receiving" only while the last segment is text — during think/tool rounds the mascot stays animated
+const receiving = computed(() => {
+  const segs = pendingMsg.value?.segments
+  if (segs?.length) return segs[segs.length - 1].type === 'text' && !!segs[segs.length - 1].text
+  return !!pendingMsg.value?.content
+})
 const attached = computed(() => datasets.attached.value)
 const ctxPct = computed(() => Math.min(100, Math.round(chat.state.ctx.tokens / chat.state.ctx.max * 100)))
 
 // one mascot, two states: animates while the model thinks, default while it replies
 const thinking = computed(() => chat.state.sending && !receiving.value)
 
-// attach/detach markers — the conversation keeps going when the file set changes
+// subtitle shows the model actually serving, e.g. "MiniCPM5-2B · Q4_K_M"
+const modelName = ref('local')
+fetch('/api/health').then(r => r.json()).then(d => {
+  modelName.value = String(d.model || '').split('/').pop()
+    .replace(/\.gguf$/i, '').replace(/-(Q\d[^-]*)$/i, ' · $1') || 'local'
+}).catch(() => {})
+
+// attach/detach markers — quiet inline notes, the conversation keeps going when the file set changes
 watch(() => [...datasets.state.attachedIds], (ids, old = []) => {
   const name = i => datasets.state.list.find(d => d.id === i)?.name || 'file'
   const on = ids.filter(i => !old.includes(i)), off = old.filter(i => !ids.includes(i))
-  if (on.length && !chat.state.messages.length) {
-    const n = datasets.attached.value.flatMap(d => d.sheets).length
-    chat.pushAssistant(`Ready to answer about ${on.map(i => `“${name(i)}”`).join(' and ')} — ${n} sheet${n === 1 ? '' : 's'} loaded. Ask me to summarize, find values, or calculate totals.`)
-  } else {
-    if (on.length) chat.note(`Attached ${on.map(name).join(', ')}`)
-    if (off.length) chat.note(`Detached ${off.map(name).join(', ')}`)
-  }
+  if (on.length) chat.note(`Attached ${on.map(name).join(', ')}`)
+  if (off.length) chat.note(`Detached ${off.map(name).join(', ')}`)
 })
 
 function scroll() {
@@ -86,7 +93,7 @@ function onKey(e) {
         <img v-else class="tabitha-avatar" :src="mascotHappy" alt="">
         <span class="chat-title-text">
           <strong>Tabitha</strong>
-          <small>Spreadsheet assistant · local</small>
+          <small>Spreadsheet assistant · {{ modelName }}</small>
         </span>
       </span>
     </template>
@@ -98,6 +105,20 @@ function onKey(e) {
       </div>
       <template v-for="(m, i) in chat.state.messages" :key="i">
         <div v-if="m.role === 'note'" class="ctx-note">{{ m.content }}</div>
+        <template v-else-if="m.segments">
+          <!-- chronological transcript: think → tools → think → reply, Claude-style -->
+          <template v-for="(s, si) in m.segments" :key="si">
+            <div v-if="s.type === 'tool'" class="toolchip" :class="{ bad: !s.ok }">
+              {{ s.ok ? '⚙' : '✕' }} {{ s.tool }}({{ chat.shortArgs(s.args) }})
+            </div>
+            <details v-else-if="s.type === 'think'" class="thinkbox"
+                     :open="chat.state.sending && i === chat.state.messages.length - 1 && si === m.segments.length - 1">
+              <summary>Deep Think</summary>
+              <div class="think">{{ s.text }}</div>
+            </details>
+            <div v-else class="bubble" v-html="chat.md(s.text)"></div>
+          </template>
+        </template>
         <template v-else>
           <div v-for="(t, ti) in m.tool_log || []" :key="ti" class="toolchip" :class="{ bad: !t.ok }">
             {{ t.ok ? '⚙' : '✕' }} {{ t.tool }}({{ chat.shortArgs(t.args) }})

@@ -7,6 +7,7 @@ export const COMMANDS = [
   { label: '/stats', hint: 'stats — /stats, /stats <column>, /stats <sheet> <column>' },
   { label: '/top', hint: 'highest rows — /top <column> [n]' },
   { label: '/bottom', hint: 'lowest rows — /bottom <column> [n]' },
+  { label: '/chart', hint: 'bar chart — /chart <column> [n]' },
   { label: '/lookup', hint: 'find a name in every sheet — /lookup <name>' },
   { label: '/deepthink', hint: 'turn Deep Think on (slower, shows reasoning)' },
   { label: '/fast', hint: 'turn Deep Think off (default, about 4x quicker)' },
@@ -29,7 +30,7 @@ export function scopeIds(text, attachedIds, list) {
   return ids
 }
 
-// `@sample_attendance` -> `the file "sample_attendance.xlsx"`: scope, not something to search for
+// `@bicol_university_attendance` -> `the file "bicol_university_attendance.xlsx"`: scope, not something to search for
 export function cleanMentions(text, list) {
   return text
     .replace(/@(\S+)/g, (m, s) => { const d = byMention(list, s); return d ? `the file "${d.name}"` : m })
@@ -42,7 +43,7 @@ function argPool(cmd, input, attachedIds, list) {
   const sheets = ds.flatMap(d => d.sheets.map(s => quote(s.name)))
   const cols = [...new Set(ds.flatMap(d => d.sheets.flatMap(s => s.columns.map(quote))))]
   if (cmd === '/list' || cmd === '/stats') return [...sheets, ...cols]
-  if (cmd === '/top' || cmd === '/bottom') return cols
+  if (cmd === '/top' || cmd === '/bottom' || cmd === '/chart') return cols
   return []
 }
 
@@ -65,7 +66,7 @@ export function suggest(input, pos, attachedIds, list) {
   if (word.startsWith('/') && !head) return show(COMMANDS)
   if (head.startsWith('/')) {
     const cmd = head.split(/\s+/)[0]
-    if (!word && !['/top', '/bottom'].includes(cmd)) return null // optional args: open only once the user types, so Enter still sends
+    if (!word && !['/top', '/bottom', '/chart'].includes(cmd)) return null // optional args: open only once the user types, so Enter still sends
     return show(argPool(cmd, input, attachedIds, list).map(label => ({ label, hint: 'column / sheet' })))
   }
   return null
@@ -96,6 +97,7 @@ export function parseCommand(text, attachedIds, list) {
     '/lookup': () => ({ tool: 'lookup', args: { name: rest.join(' ') } }),
     '/top': () => ({ tool: 'top_rows', args: { sheet: colSheet, column: rest[0], n: +rest[1] || 5 } }),
     '/bottom': () => ({ tool: 'top_rows', args: { sheet: colSheet, column: rest[0], n: +rest[1] || 5, ascending: true } }),
+    '/chart': () => ({ tool: 'bar_chart', args: { sheet: colSheet, column: rest[0], n: +rest[1] || 15 } }),
   }
   if (!specs[cmd]) return { error: `Unknown command ${cmd} — try /help` }
   if (!ids.length) return { error: 'Pick a file first (or @mention one) before running commands.' }

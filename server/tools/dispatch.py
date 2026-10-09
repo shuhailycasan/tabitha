@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from .calculator import safe_eval
+from .graph import bar_chart
 from .sheets import get_col, get_sheet, summarize_col
 from .render import md_table, rows_json
 
@@ -42,6 +43,10 @@ def run_tool(dataset, name, args):
         if args.get("sort_by"):
             out = out.sort_values(get_col(df, args["sort_by"]), ascending=bool(args.get("ascending", True)))
         return {"table": md_table(out.head(min(int(args.get("limit") or 30), 50)), len(out))}
+    if name == "bar_chart":
+        val = get_col(df, args.get("column", ""))
+        lab = get_col(df, args["by"]) if args.get("by") else df.columns[0]
+        return bar_chart(df, lab, val, args.get("n") or 15, bool(args.get("ascending", False)))
     if name == "top_rows":
         col = get_col(df, args["column"])
         return rows_json(df.sort_values(col, ascending=bool(args.get("ascending", False))), args.get("n", 5))

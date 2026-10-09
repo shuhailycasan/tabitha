@@ -5,7 +5,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from chat import compact_history, stream_events
-from config import AUTO_COMPACT, CLIENT_DIR, CTX_TOKENS, HOST, PORT, UPLOAD_DIR
+from config import AUTO_COMPACT, CLIENT_DIR, CTX_TOKENS, HOST, LLM_MODEL, PORT, UPLOAD_DIR
 from prompts import system_prompt
 from state import CANCELLED, DATASETS, combined_dataset, dataset_info, load_sheets
 from tools import TOOLS_CHARS, md_result, run_tool
@@ -17,6 +17,11 @@ app = Flask(__name__, static_folder=str(CLIENT_DIR), static_url_path="")
 @app.get("/")
 def index():
     return app.send_static_file("index.html")  # static, not Jinja — Vue owns the {{ }}
+
+
+@app.get("/api/health")
+def health():
+    return jsonify({"ok": True, "model": LLM_MODEL, "ctx": CTX_TOKENS})
 
 
 @app.post("/api/upload")

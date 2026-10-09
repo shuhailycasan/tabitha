@@ -40,8 +40,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .top-app { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #173a20; }
 .logo-small { width: 34px; height: 34px; object-fit: contain; }
 .top-right { font-size: 11px; color: #43564a; }
-.top-state { display: flex; align-items: center; gap: 6px; }
-.online-dot { width: 7px; height: 7px; border-radius: 50%; background: #2f9955; box-shadow: 0 0 4px rgba(47, 153, 85, .55); }
+
 .clock { font-variant-numeric: tabular-nums; font-weight: 600; }
 .top-menu { border: 0; width: 27px; height: 27px; border-radius: 50%; background: transparent; color: #2c4034; font-size: 16px; }
 .top-menu:hover { background: rgba(23, 58, 32, .09); }
