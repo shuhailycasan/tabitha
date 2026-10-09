@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassChat — ask your spreadsheet</title>
+<style>
+  :root {
+    --primary: #4F46E5; --primary-hover: #4338CA; --on-primary: #FFFFFF;
+    --accent: #EA580C;
+    --bg: #EEF2FF; --fg: #1E1B4B; --card: #FFFFFF;
+    --muted: #EBEEF8; --muted-fg: #475569; --border: #C7D2FE;
+    --danger: #DC2626;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.5; background: var(--bg); color: var(--fg);
+    min-height: 100dvh;
+  }
+  :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  header {
+    background: var(--primary); color: var(--on-primary);
+    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+  }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header p { margin: 0; font-size: 13px; opacity: 0.85; }
+
+  .layout { display: grid; gap: 16px; padding: 16px; max-width: 1200px; margin: 0 auto; }
+  @media (min-width: 1024px) { .layout { grid-template-columns: 320px 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+
+  /* Upload */
+  .dropzone {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 24px 12px; text-align: center; cursor: pointer;
+    color: var(--muted-fg); transition: border-color 150ms, background 150ms;
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--primary); background: var(--muted); }
+  .dropzone svg { width: 32px; height: 32px; stroke: var(--primary); }
+  .dropzone strong { color: var(--fg); font-weight: 600; }
+  .dropzone small { font-size: 12px; }
+
+  .dataset {
+    display: flex; align-items: flex-start; gap: 10px; width: 100%;
+    padding: 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--card); text-align: left; margin-top: 10px; min-height: 44px;
+  }
+  .dataset.active { border-color: var(--primary); background: var(--muted); }
+  .dataset svg { width: 20px; height: 20px; stroke: var(--primary); flex-shrink: 0; margin-top: 2px; }
+  .dataset .meta { flex: 1; min-width: 0; }
+  .dataset .name { font-weight: 600; overflow-wrap: anywhere; }
+  .dataset .sheets { font-size: 13px; color: var(--muted-fg); }
+  .dataset .del {
+    border: 0; background: none; padding: 4px; color: var(--muted-fg);
+    min-width: 44px; min-height: 44px; margin: -12px -12px -12px 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dataset .del:hover { color: var(--danger); }
+  .dataset .del svg { stroke: currentColor; width: 16px; height: 16px; margin: 0; }
+
+  .cols { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cols span {
+    font-size: 12px; background: var(--muted); color: var(--muted-fg);
+    border-radius: 999px; padding: 2px 10px;
+  }
+
+  /* Chat */
+  .chat { display: flex; flex-direction: column; min-height: 60dvh; }
+  .chat-log {
+    flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+    padding: 4px; max-height: calc(100dvh - 260px);
+  }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: var(--muted); border-bottom-left-radius: 4px; }
+  .toolchip {
+    align-self: flex-start; font-size: 12px; color: var(--muted-fg);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; padding: 2px 10px;
+  }
+  .toolchip.bad { color: var(--danger); border-color: var(--danger); }
+  .empty { color: var(--muted-fg); text-align: center; margin: auto; padding: 24px; }
+  .suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+  .suggest button {
+    border: 1px solid var(--border); background: var(--card); border-radius: 999px;
+    padding: 8px 14px; font-size: 14px; color: var(--fg); min-height: 44px;
+  }
+  .suggest button:hover { border-color: var(--primary); color: var(--primary); }
+
+  .composer { display: flex; gap: 8px; margin-top: 12px; }
+  .composer textarea {
+    flex: 1; resize: none; font: inherit; padding: 10px 12px; min-height: 44px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--card);
+  }
+  .send {
+    background: var(--primary); color: var(--on-primary); border: 0;
+    border-radius: var(--radius); min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center; padding: 0 16px;
+  }
+  .send:hover:not(:disabled) { background: var(--primary-hover); }
+  .send.cancel { background: var(--accent); }
+  .send.cancel:hover { background: #C2410C; }
+  .send svg { width: 20px; height: 20px; stroke: currentColor; }
+
+  .alert {
+    background: #FEF2F2; color: var(--danger); border: 1px solid #FECACA;
+    border-radius: var(--radius); padding: 10px 14px; margin-top: 10px; font-size: 14px;
+  }
+  .hint { font-size: 13px; color: var(--muted-fg); }
+  .toggle { display: flex; align-items: center; gap: 8px; margin-top: 10px; min-height: 24px; cursor: pointer; }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--primary); }
+  .thinking { color: var(--muted-fg); font-size: 14px; align-self: flex-start; }
+  .dots i { font-style: normal; animation: blink 1.2s infinite; }
+  .dots i:nth-child(2) { animation-delay: .2s; }
+  .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+  .thinkbox { align-self: flex-start; max-width: 80%; font-size: 12px; color: var(--muted-fg); }
+  .thinkbox summary { cursor: pointer; opacity: .8; }
+  .think {
+    margin-top: 4px; font-style: italic; opacity: .75;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+    max-height: 9em; overflow-y: auto;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 10px;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>ClassChat</h1>
+      <p>Upload a spreadsheet. Ask questions about it.</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section aria-label="Datasets">
+      <div class="card">
+        <label class="dropzone" for="file" @dragover.prevent="dragover = true" @dragleave="dragover = false"
+               @drop.prevent="onDrop" :class="{ dragover }">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"/>
+          </svg>
+          <strong>{{ uploading ? 'Uploading…' : 'Upload Excel or CSV' }}</strong>
+          <small>.xlsx or .csv — grades, tests, attendance, anything tabular</small>
+        </label>
+        <input id="file" type="file" accept=".xlsx,.xls,.csv" @change="onFile" hidden>
+        <div v-if="uploadError" class="alert" role="alert">{{ uploadError }}</div>
+
+        <div v-for="d in datasets" :key="d.id" class="dataset" :class="{ active: d.id === selectedId }"
+             role="button" tabindex="0" @click="select(d.id)" @keydown.enter="select(d.id)">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
+          </svg>
+          <div class="meta">
+            <div class="name">{{ d.name }}</div>
+            <div class="sheets" v-for="s in d.sheets" :key="s.name">{{ s.name }} — {{ s.rows }} rows</div>
+            <div class="cols" v-if="d.id === selectedId">
+              <span v-for="c in allColumns" :key="c">{{ c }}</span>
+            </div>
+          </div>
+          <button class="del" @click.stop="remove(d.id)" :aria-label="'Remove ' + d.name">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card chat" aria-label="Chat">
+      <div class="chat-log" ref="log" aria-live="polite">
+        <div v-if="!selectedId" class="empty">
+          <p>Upload a spreadsheet on the left to start.</p>
+        </div>
+        <div v-else-if="!messages.length" class="empty">
+          <p>Ask me anything about <strong>{{ selected.name }}</strong>.</p>
+          <div class="suggest">
+            <button v-for="q in suggestions" :key="q" @click="ask(q)">{{ q }}</button>
+          </div>
+        </div>
+        <template v-for="(m, i) in messages" :key="i">
+          <div v-for="t in m.tool_log || []" class="toolchip" :class="{ bad: !t.ok }">
+            {{ t.ok ? '⚙' : '✕' }} {{ t.tool }}({{ shortArgs(t.args) }})
+          </div>
+          <details v-if="m.think" class="thinkbox" :open="sending && i === messages.length - 1">
+            <summary>Model thinking</summary>
+            <div class="think" ref="thinkbox">{{ m.think }}</div>
+          </details>
+          <div v-if="m.content" class="msg" :class="m.role === 'user' ? 'user' : 'bot'" v-html="md(m.content)"></div>
+        </template>
+        <div v-if="sending && !receiving" class="thinking">
+          <span>{{ status || 'Thinking' }}</span><span class="dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>
+        </div>
+      </div>
+
+      <div v-if="chatError" class="alert" role="alert">{{ chatError }}</div>
+      <label class="hint toggle"><input type="checkbox" v-model="think" :disabled="sending">
+        Think step by step <span>({{ think ? 'slower, more careful, shows reasoning' : 'fast mode, about 4x quicker' }})</span></label>
+      <form class="composer" @submit.prevent="send">
+        <label for="chat-input" class="hint" style="position:absolute;left:-9999px">Message</label>
+        <textarea id="chat-input" v-model="input" rows="1" required
+                  :placeholder="selectedId ? 'Ask about the data…' : 'Upload a file first'"
+                  :disabled="!selectedId || sending"
+                  @keydown.enter.exact.prevent="send"></textarea>
+        <button v-if="sending" class="send cancel" type="button" @click="cancel" aria-label="Stop generating">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z"/>
+          </svg>
+        </button>
+        <button v-else class="send" type="submit" :disabled="!selectedId || !input.trim()" aria-label="Send">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
+          </svg>
+        </button>
+      </form>
+    </section>
+  </main>
+</div>
+
+<script src="/static/vendor/vue.global.prod.js"></script>
+<script>
+const { createApp, nextTick } = Vue;
+
+createApp({
+  data() {
+    return {
+      datasets: [], selectedId: null,
+      messages: [], input: '', sending: false, abortCtrl: null, status: '', think: true,
+      uploading: false, uploadError: '', chatError: '', dragover: false,
+      suggestions: [
+        'How many students are there?',
+        'Who has the highest grade?',
+        'What is the average score?',
+      ],
+    };
+  },
+  computed: {
+    selected() { return this.datasets.find(d => d.id === this.selectedId); },
+    allColumns() {
+      if (!this.selected) return [];
+      return this.selected.sheets.flatMap(s => s.columns);
+    },
+    pendingMsg() {
+      const m = this.messages[this.messages.length - 1];
+      return m && m.role === 'assistant' ? m : null;
+    },
+    receiving() { return !!(this.pendingMsg && this.pendingMsg.content); },
+  },
+  methods: {
+    select(id) { this.selectedId = id; this.messages = []; this.chatError = ''; },
+    onDrop(e) { this.dragover = false; if (e.dataTransfer.files[0]) this.upload(e.dataTransfer.files[0]); },
+    onFile(e) { if (e.target.files[0]) this.upload(e.target.files[0]); e.target.value = ''; },
+    async upload(file) {
+      this.uploading = true; this.uploadError = '';
+      try {
+        const fd = new FormData(); fd.append('file', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        this.datasets.push(data); this.select(data.id);
+      } catch (e) { this.uploadError = e.message; }
+      this.uploading = false;
+    },
+    async remove(id) {
+      await fetch('/api/datasets/' + id, { method: 'DELETE' });
+      this.datasets = this.datasets.filter(d => d.id !== id);
+      if (this.selectedId === id) { this.selectedId = this.datasets[0]?.id || null; this.messages = []; }
+    },
+    ask(q) { this.input = q; this.send(); },
+    shortArgs(args) {
+      return Object.entries(args || {}).map(([k, v]) => `${k}=${v}`).join(', ');
+    },
+    md(t) {  // minimal markdown: escape HTML first, then **bold** — model emits it, no lib needed
+      return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    },
+    async send() {
+      const text = this.input.trim();
+      if (!text || !this.selectedId || this.sending) return;
+      this.input = ''; this.chatError = ''; this.sending = true; this.status = 'Thinking…';
+      this.abortCtrl = new AbortController();
+      this.reqId = crypto.randomUUID();
+      this.messages.push({ role: 'user', content: text });
+      this.messages.push({ role: 'assistant', content: '', tool_log: [], think: '' });
+      const pending = this.messages[this.messages.length - 1];  // reactive proxy — mutating the raw object would not re-render
+      this.scroll();
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          signal: this.abortCtrl.signal,
+          body: JSON.stringify({
+            dataset_id: this.selectedId,
+            request_id: this.reqId,
+            think: this.think,
+            messages: this.messages.filter(m => m !== pending)
+              .map(m => ({ role: m.role, content: m.content })),
+          }),
+        });
+        if (!res.ok) {
+          let msg = 'Chat failed';
+          try { msg = (await res.json()).error || msg; } catch {}
+          throw new Error(msg);
+        }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf('\n')) >= 0) {
+            const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+            if (!line) continue;
+            const e = JSON.parse(line);
+            if (e.type === 'status') this.status = e.text;
+            else if (e.type === 'think') { pending.think += e.text; this.scrollThink(); }
+            else if (e.type === 'tool') { pending.tool_log.push(e); this.scroll(); }
+            else if (e.type === 'delta') { pending.content += e.text; this.scroll(); }
+            else if (e.type === 'done') { pending.content = e.reply || pending.content; }
+            else if (e.type === 'error') throw new Error(e.error);
+          }
+        }
+      } catch (e) {
+        const idx = this.messages.indexOf(pending);
+        if (idx >= 0) this.messages.splice(idx, 1);
+        if (e.name !== 'AbortError') this.chatError = e.message + ' — try again.';
+      }
+      this.sending = false; this.abortCtrl = null; this.status = ''; this.scroll();
+    },
+    cancel() {
+      if (this.abortCtrl) this.abortCtrl.abort();
+      if (this.reqId) fetch('/api/cancel/' + this.reqId, { method: 'POST' });
+    },
+    scroll() { nextTick(() => { const el = this.$refs.log; if (el) el.scrollTop = el.scrollHeight; }); },
+    scrollThink() {
+      nextTick(() => {
+        const refs = this.$refs.thinkbox;
+        const el = Array.isArray(refs) ? refs[refs.length - 1] : refs;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    },
+  },
+  async mounted() {
+    const res = await fetch('/api/datasets');
+    this.datasets = await res.json();
+    if (this.datasets.length) this.selectedId = this.datasets[0].id;
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
