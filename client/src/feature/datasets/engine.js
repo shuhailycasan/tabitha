@@ -1,18 +1,16 @@
-// datasets engine — server-side workbooks: list, upload, delete, active selection.
-// These are the datasets the chat backend can answer questions about.
+// datasets engine — server-side workbooks: list, upload, delete, explicit attach set.
+// Chat can only touch datasets the user attached (drag onto the chat window or @mention) —
+// uploading or viewing a file never feeds it to the model.
 import { reactive, computed } from 'vue'
 
-const state = reactive({ list: [], activeId: null, uploading: false, error: '' })
-const active = computed(() => state.list.find(d => d.id === state.activeId) || null)
+const state = reactive({ list: [], attachedIds: [], uploading: false, error: '' })
+const attached = computed(() => state.attachedIds.map(id => state.list.find(d => d.id === id)).filter(Boolean))
 
 async function refresh() {
   try {
     const res = await fetch('/api/datasets')
     state.list = await res.json()
-    if (!state.activeId && state.list.length) state.activeId = state.list[0].id
-    if (state.activeId && !state.list.some(d => d.id === state.activeId)) {
-      state.activeId = state.list[0]?.id || null
-    }
+    state.attachedIds = state.attachedIds.filter(id => state.list.some(d => d.id === id))
   } catch (e) {
     state.error = 'Could not reach the server.'
   }
@@ -28,8 +26,7 @@ async function upload(file) {
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Upload failed')
     state.list.push(data)
-    state.activeId = data.id
-    return data
+    return data  // NB: not attached — the user attaches explicitly
   } catch (e) {
     state.error = e.message
     return null
@@ -41,11 +38,15 @@ async function upload(file) {
 async function remove(id) {
   await fetch('/api/datasets/' + id, { method: 'DELETE' })
   state.list = state.list.filter(d => d.id !== id)
-  if (state.activeId === id) state.activeId = state.list[0]?.id || null
+  state.attachedIds = state.attachedIds.filter(i => i !== id)
 }
 
-function select(id) {
-  state.activeId = id
+function attach(id) {
+  if (id && !state.attachedIds.includes(id)) state.attachedIds.push(id)
 }
 
-export const datasets = { state, active, refresh, upload, remove, select }
+function detach(id) {
+  state.attachedIds = state.attachedIds.filter(i => i !== id)
+}
+
+export const datasets = { state, attached, refresh, upload, remove, attach, detach }

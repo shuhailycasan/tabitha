@@ -8,8 +8,8 @@ export const COMMANDS = [
   { label: '/top', hint: 'highest rows — /top <column> [n]' },
   { label: '/bottom', hint: 'lowest rows — /bottom <column> [n]' },
   { label: '/lookup', hint: 'find a name in every sheet — /lookup <name>' },
-  { label: '/think', hint: 'turn step-by-step thinking on' },
-  { label: '/fast', hint: 'turn thinking off (about 4x quicker)' },
+  { label: '/deepthink', hint: 'turn Deep Think on (slower, shows reasoning)' },
+  { label: '/fast', hint: 'turn Deep Think off (default, about 4x quicker)' },
   { label: '/clear', hint: 'clear this chat' },
   { label: '/help', hint: 'show these commands' },
 ]
@@ -19,9 +19,9 @@ const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase()
 const quote = s => (/\s/.test(s) ? `"${s}"` : s)
 const byMention = (list, name) => list.find(d => same(stem(d.name), name))
 
-// active dataset first, then each @mentioned file
-export function scopeIds(text, activeId, list) {
-  const ids = activeId ? [activeId] : []
+// attached datasets first, then each @mentioned file
+export function scopeIds(text, attachedIds, list) {
+  const ids = [...attachedIds]
   for (const m of text.matchAll(/@(\S+)/g)) {
     const d = byMention(list, m[1])
     if (d && !ids.includes(d.id)) ids.push(d.id)
@@ -37,8 +37,8 @@ export function cleanMentions(text, list) {
 }
 
 // 2nd-stage suggestions for a command's arguments: real sheet/column names of the files in scope
-function argPool(cmd, input, activeId, list) {
-  const ds = scopeIds(input, activeId, list).map(i => list.find(d => d.id === i)).filter(Boolean)
+function argPool(cmd, input, attachedIds, list) {
+  const ds = scopeIds(input, attachedIds, list).map(i => list.find(d => d.id === i)).filter(Boolean)
   const sheets = ds.flatMap(d => d.sheets.map(s => quote(s.name)))
   const cols = [...new Set(ds.flatMap(d => d.sheets.flatMap(s => s.columns.map(quote))))]
   if (cmd === '/list' || cmd === '/stats') return [...sheets, ...cols]
@@ -47,7 +47,7 @@ function argPool(cmd, input, activeId, list) {
 }
 
 // Popup state for the word under the cursor, or null. A word typed in full yields null so Enter sends.
-export function suggest(input, pos, activeId, list) {
+export function suggest(input, pos, attachedIds, list) {
   const before = input.slice(0, pos)
   const m = before.match(/(?:^|\s)(\S*)$/)
   if (!m) return null
@@ -66,20 +66,20 @@ export function suggest(input, pos, activeId, list) {
   if (head.startsWith('/')) {
     const cmd = head.split(/\s+/)[0]
     if (!word && !['/top', '/bottom'].includes(cmd)) return null // optional args: open only once the user types, so Enter still sends
-    return show(argPool(cmd, input, activeId, list).map(label => ({ label, hint: 'column / sheet' })))
+    return show(argPool(cmd, input, attachedIds, list).map(label => ({ label, hint: 'column / sheet' })))
   }
   return null
 }
 
 // "/stats "Days Absent"" -> { ids, tool, args } | { local } | { error }
-export function parseCommand(text, activeId, list) {
+export function parseCommand(text, attachedIds, list) {
   const parts = text.match(/"[^"]*"|\S+/g) || []
   const cmd = parts[0]
   const rest = parts.slice(1).filter(p => !p.startsWith('@')).map(p => p.replace(/^"|"$/g, '')) // @file is scope, not an argument
-  const local = { '/clear': 'clear', '/fast': 'fast', '/think': 'think', '/help': 'help' }[cmd]
+  const local = { '/clear': 'clear', '/fast': 'fast', '/deepthink': 'think', '/think': 'think', '/help': 'help' }[cmd]
   if (local) return { local }
 
-  const ids = scopeIds(text, activeId, list)
+  const ids = scopeIds(text, attachedIds, list)
   const ds = ids.map(i => list.find(d => d.id === i)).filter(Boolean)
   const lastSheet = ds[ds.length - 1]?.sheets[0]?.name // the @mentioned file, else the active one
   const isSheet = n => same(n, 'all') || ds.some(d => d.sheets.some(s => same(s.name, n)))

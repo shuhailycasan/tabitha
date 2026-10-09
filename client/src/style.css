@@ -23,7 +23,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---- desktop chrome ---- */
-.desktop { position: relative; width: 100%; height: 100%; overflow: hidden; background: #fff; }
+.desktop {
+  position: relative; width: 100%; height: 100%; overflow: hidden;
+  background: #fff url('/wallpaper.png') center / cover no-repeat;
+}
 .file-input { display: none; }
 
 .topbar {
@@ -187,6 +190,28 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---- chat window ---- */
 .chat-window.drop-target { outline: 3px dashed var(--green-2); outline-offset: -6px; border-color: var(--green-2); }
+
+/* Deep Think on — a soft green glow slowly sweeping around the window edge */
+@property --dt-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.chat-window.deepthink {
+  border-color: rgba(52, 211, 153, .5);
+  box-shadow: var(--shadow), 0 0 20px rgba(52, 211, 153, .3);
+}
+.chat-window.deepthink::before {
+  content: ''; position: absolute; inset: 0; z-index: 6;
+  border: 3px solid transparent; border-radius: var(--radius);
+  background: conic-gradient(from var(--dt-angle),
+      transparent 0deg, rgba(74, 222, 128, .9) 45deg, transparent 95deg,
+      transparent 180deg, rgba(74, 222, 128, .35) 225deg, transparent 275deg) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: deepthink-glow 5s linear infinite;
+  pointer-events: none;
+}
+@keyframes deepthink-glow { to { --dt-angle: 360deg; } }
+.toggle:has(input:checked) { color: var(--green-2); font-weight: 650; }
 .chat-head { height: 53px; }
 .chat-title { display: flex; align-items: center; gap: 9px; }
 .tabitha-avatar { width: 40px; height: 40px; object-fit: contain; }
@@ -194,18 +219,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .chat-title-text strong { font-size: 13px; }
 .chat-title-text small { font-size: 10px; color: var(--muted); font-weight: 400; }
 .chat-content { display: flex; flex-direction: column; }
-
-.chat-context {
-  flex: none; display: flex; align-items: center; gap: 6px;
-  padding: 6px 10px; border-bottom: 1px solid var(--line); background: #fafbf9; font-size: 11px;
-}
-.ctx-label { color: var(--muted); flex: none; }
-.chat-context select {
-  flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 7px;
-  background: white; color: var(--ink); font-size: 11px; padding: 3px 6px;
-}
-.ctx-del { flex: none; width: 22px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: #899389; font-size: 13px; }
-.ctx-del:hover { background: #fbe9e9; color: #c22; }
 
 .messages { flex: 1; min-height: 0; overflow-y: auto; padding: 15px 13px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
 .welcome { align-self: flex-start; display: flex; gap: 8px; max-width: 95%; align-items: flex-end; }
@@ -269,6 +282,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .send.cancel { background: #b3561e; font-size: 11px; }
 .send.cancel:hover { background: #96450f; }
 .chat-note { padding: 5px 3px 0; color: #899389; text-align: center; font-size: 9px; }
+.queue-chip {
+  margin-bottom: 7px; padding: 4px 9px; border: 1px dashed #c9a24b; border-radius: 8px;
+  background: #fdf6e3; color: #7a5b1a; font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ctxbar { display: flex; align-items: center; gap: 7px; padding: 7px 3px 0; font-size: 9px; color: #899389; }
+.ctxbar-track { flex: 1; height: 4px; border-radius: 3px; background: #e3e9e2; overflow: hidden; }
+.ctxbar-track i { display: block; height: 100%; border-radius: 3px; background: var(--green-2); transition: width .3s; }
+.ctxbar-track i.hot { background: #d08700; }
+.ctx-note { align-self: center; font-size: 10px; color: var(--muted); padding: 1px 10px; border: 1px solid var(--line); border-radius: 999px; background: #f7f9f6; }
 
 /* ---- dock + toast ---- */
 .dock {

@@ -74,22 +74,6 @@ async function removeFile(item) {
   desktop.toast('Removed ' + item.name)
 }
 
-// Seed the bundled sample workbooks as desktop icons on first run —
-// restored icons/datasets already on the desktop are skipped by name.
-const SAMPLES = ['sample_grades.xlsx', 'sample_attendance.xlsx', 'sample_tests.xlsx']
-async function seedSamples() {
-  for (const name of SAMPLES) {
-    if (files.state.items.some(i => i.name === name)) continue
-    try {
-      const res = await fetch('/samples/' + name)
-      if (!res.ok) continue
-      const file = new File([await res.blob()], name)
-      const datasetId = await uploadForChat(file)
-      files.add({ name, file, datasetId })
-    } catch { /* samples are best-effort */ }
-  }
-}
-
 // Icons restored from IndexedDB may point at datasets the restarted server forgot —
 // re-upload the stored File so drag-to-chat works again.
 async function reviveStale() {
@@ -113,8 +97,8 @@ async function attachToChat(item) {
     desktop.toast(`Tabitha can't query “${item.name}” — it was never uploaded`)
     return
   }
-  datasets.select(item.datasetId)
-  desktop.toast(`Tabitha will answer about “${item.name}”`)
+  datasets.attach(item.datasetId)
+  desktop.toast(`Attached “${item.name}” — drop another to combine`)
 }
 
 onMounted(async () => {
@@ -122,9 +106,6 @@ onMounted(async () => {
   await files.restore() // icons + File objects saved in IndexedDB from previous sessions
   await datasets.refresh()
   await reviveStale()
-  // datasets already on the server get desktop icons too (view needs a local re-open)
-  for (const d of datasets.state.list) files.add({ name: d.name, datasetId: d.id })
-  seedSamples()
 })
 </script>
 

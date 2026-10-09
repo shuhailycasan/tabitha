@@ -5,11 +5,13 @@ import { datasets } from '../datasets/engine.js'
 import { COMMANDS, scopeIds, cleanMentions, parseCommand } from './commands.js'
 
 const state = reactive({
-  messages: [],        // { role, content, think?, tool_log? }
+  messages: [],        // { role, content, think?, tool_log? } — role 'note' is a UI-only divider
   sending: false,
+  queued: null,        // text typed while busy — a second Enter interrupts and sends it instead
+  ctx: { tokens: 0, max: 8192 },  // server's prompt estimate vs the context window
   status: '',          // last "status" event text
   error: '',
-  thinkEnabled: true,
+  thinkEnabled: false,
   version: 0,          // bumped per stream event — components watch it to autoscroll
 })
 
@@ -19,7 +21,10 @@ let reqId = null
 function bump() { state.version++ }
 
 function reset() {
+  cancel()
   state.messages = []
+  state.queued = null
+  state.ctx = { tokens: 0, max: 8192 }
   state.error = ''
 }
 
@@ -28,14 +33,20 @@ function pushAssistant(text) {
   bump()
 }
 
+// UI-only divider (filtered out of the request server-side) — e.g. attach/detach markers
+function note(text) {
+  state.messages.push({ role: 'note', content: text })
+  bump()
+}
+
 // /commands run backend tools directly (POST /api/run) — instant, no LLM
 async function command(text) {
-  const { activeId, list } = datasets.state
-  const c = parseCommand(text, activeId, list)
+  const { attachedIds, list } = datasets.state
+  const c = parseCommand(text, attachedIds, list)
   state.error = ''
   if (c.local === 'clear') return reset()
-  if (c.local === 'fast') { state.thinkEnabled = false; return pushAssistant('Fast mode on — answers skip the thinking step.') }
-  if (c.local === 'think') { state.thinkEnabled = true; return pushAssistant('Thinking mode on — slower, shows reasoning.') }
+  if (c.local === 'fast') { state.thinkEnabled = false; return pushAssistant('Deep Think off — fast answers, no reasoning step.') }
+  if (c.local === 'think') { state.thinkEnabled = true; return pushAssistant('Deep Think on — slower, shows reasoning.') }
   if (c.local === 'help') {
     return pushAssistant(COMMANDS.map(x => `**${x.label}** — ${x.hint}`).join('\n') + '\n\nTip: @file adds another uploaded file to your question.')
   }
@@ -60,17 +71,26 @@ async function command(text) {
 
 async function send(text) {
   text = (text || '').trim()
-  if (!text || state.sending) return
-  if (text.startsWith('/')) return command(text)
-  const { activeId, list } = datasets.state
-  const ids = scopeIds(text, activeId, list)
-  if (!ids.length) return
+  if (!text && !state.queued) return
+  if (text.startsWith('/')) return command(text)  // commands are instant — never queued
+  if (state.sending) {
+    // first Enter while busy queues; second Enter interrupts — newest input wins, else flush the queue
+    if (state.queued == null) { state.queued = text; return bump() }
+    const next = text || state.queued
+    state.queued = null
+    cancel()
+    text = next
+  }
+  if (!text) return
+  const { attachedIds, list } = datasets.state
+  const ids = scopeIds(text, attachedIds, list)  // may be empty — plain chatbot mode, no tools
   const clean = cleanMentions(text, list)
 
   state.error = ''
   state.sending = true
   state.status = 'Thinking…'
-  abortCtrl = new AbortController()
+  const myCtrl = new AbortController()
+  abortCtrl = myCtrl
   reqId = crypto.randomUUID()
 
   state.messages.push({ role: 'user', content: text })
@@ -111,27 +131,44 @@ async function send(text) {
         if (!line) continue
         const e = JSON.parse(line)
         if (e.type === 'status') state.status = e.text
+        else if (e.type === 'ctx') state.ctx = { tokens: e.tokens, max: e.max }
+        else if (e.type === 'compact') {
+          const j = state.messages.indexOf(pending)
+          state.messages.splice(j < 0 ? state.messages.length : j, 0,
+            { role: 'note', content: `Context compacted — ${e.dropped} earlier message(s) dropped` })
+        }
         else if (e.type === 'think') pending.think += e.text
         else if (e.type === 'tool') pending.tool_log.push(e)
         else if (e.type === 'delta') pending.content += e.text
-        else if (e.type === 'done') pending.content = e.reply || pending.content
+        else if (e.type === 'done') {
+          pending.content = e.reply || pending.content
+          if (e.ctx) state.ctx = e.ctx
+        }
         else if (e.type === 'error') throw new Error(e.error)
         bump()
       }
     }
   } catch (e) {
     const idx = state.messages.indexOf(pending)
-    if (idx >= 0) state.messages.splice(idx, 1)
-    if (e.name !== 'AbortError') state.error = e.message + ' — try again.'
+    if (e.name === 'AbortError') {
+      // interrupted — keep whatever streamed in, marked as stopped
+      if (idx >= 0) pending.content = pending.content ? pending.content.trimEnd() + '\n\n(stopped)' : '(stopped)'
+    } else {
+      if (idx >= 0) state.messages.splice(idx, 1)
+      state.error = e.message + ' — try again.'
+    }
   }
 
-  state.sending = false
-  abortCtrl = null
+  // an interrupt replaces abortCtrl mid-flight — only the owner may clear the busy flag
+  const mine = abortCtrl === myCtrl
+  if (mine) { state.sending = false; abortCtrl = null }
   state.status = ''
   bump()
+  if (mine && state.queued) { const q = state.queued; state.queued = null; send(q) }
 }
 
 function cancel() {
+  state.queued = null  // stop means stop — don't fire a queued message afterwards
   if (abortCtrl) abortCtrl.abort()
   if (reqId) fetch('/api/cancel/' + reqId, { method: 'POST' })
 }
@@ -157,4 +194,4 @@ function md(t) {
   return out.join('\n').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
 }
 
-export const chat = { state, send, cancel, reset, pushAssistant, shortArgs, md }
+export const chat = { state, send, cancel, reset, pushAssistant, note, shortArgs, md }

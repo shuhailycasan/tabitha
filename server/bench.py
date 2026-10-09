@@ -8,9 +8,9 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
-SAMPLE = Path(__file__).parent.parent / "data" / "sample_grades.xlsx"
+SAMPLE = Path(__file__).parent.parent / "client" / "public" / "samples" / "sample_grades.xlsx"
 
-BASE = "http://localhost:8777"
+BASE = "http://localhost:2424"
 THINK = "fast" not in sys.argv  # python bench.py fast  -> thinking off
 CASES = [  # (question, substrings that must all appear in the reply)
     ("How many students are there?", ["15"]),
