@@ -34,6 +34,15 @@ def get_sheet(dataset, name):
         return sheets[match]
     if len(sheets) == 1:
         return next(iter(sheets.values()))
+    norm = lambda s: str(s).lower().replace(" ", "").replace("_", "")
+    stem = lambda s: norm(s).rsplit(".", 1)[0]  # file names carry .xlsx — compare stems
+    if stem(name) in {stem(f) for f in dataset.get("files", [])}:
+        raise ValueError(f"'{name}' is a file name, not a sheet. Its sheets: {list(sheets)} — pass one of those.")
+    hits = [s for s in sheets if norm(name) in norm(s)]
+    if len(hits) == 1:
+        return sheets[hits[0]]
+    if len(hits) > 1:
+        raise ValueError(f"Ambiguous sheet '{name}' — pick one exactly: {hits}")
     raise ValueError(f"Unknown sheet '{name}'. Available: {list(sheets)}")
 
 

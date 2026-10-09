@@ -52,18 +52,25 @@ TOOLS = [
          "ascending": _ASC},
         ["sheet", "by"]),
     _fn("bar_chart",
-        "Draw a bar chart. Numeric 'column' -> top-N bars per row. 'by' alone or op 'count' -> count rows per "
-        "category (e.g. how many Present vs Absent). 'by' + 'column' + op avg/sum/min/max -> aggregate per group. "
+        "Draw a bar chart. Sheet data: 'column' numeric -> top-N bars per row; 'by' alone or op 'count' -> count per "
+        "category (e.g. how many Present vs Absent); 'by' + 'column' + op avg/sum/min/max -> aggregate per group. "
+        "Custom data: 'labels' + 'values' (+ optional 'title') -> chart numbers you already computed yourself — "
+        "use this when the data to chart is not a single column, e.g. results combined across sheets or from other tools. "
         "The chart is drawn for the user automatically — do NOT paste any table or bars into your answer, just say what it shows. "
-        "Use for: bar graph, chart, plot, visualize, count per category, average per group, compare values as bars.",
+        "Use for: bar graph, chart, plot, visualize, count per category, average per group, chart your computed results.",
         {"sheet": _SHEET,
          "column": {**_COL, "description": "Numeric column for bar heights. Omit for a count-per-'by' chart."},
          "by": {**_COL, "description": "Category/label column. Omit for the first column (usually names)."},
          "op": {"type": "string", "enum": ["count", "avg", "sum", "min", "max"],
                 "description": "Optional. Aggregate 'column' per 'by' group; 'count' ignores 'column'."},
+         "labels": {"type": "array", "items": {"type": "string"},
+                    "description": "Custom mode: bar labels you supply. Use with 'values' for data not in a single column."},
+         "values": {"type": "array", "items": {"type": "number"},
+                    "description": "Custom mode: bar heights matching 'labels'. Supplying this ignores sheet/column/by/op."},
+         "title": {"type": "string", "description": "Optional chart title (custom mode)."},
          "n": {"type": "integer", "description": "How many bars (default 15, max 25)"},
          "ascending": _ASC},
-        ["sheet"]),
+        []),
     _fn("list_sheets",
         "List the sheets in the loaded file(s) with row counts and column names. "
         "Use for: what sheets are there, what data do we have, which sheet has X, show the structure.",

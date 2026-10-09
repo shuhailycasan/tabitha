@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from .calculator import safe_eval
-from .graph import bar_chart
+from .graph import bar_chart, points_chart
 from .sheets import get_col, get_sheet, summarize_col
 from .render import md_table, rows_json
 
@@ -79,6 +79,15 @@ def run_tool(dataset, name, args):
     if name == "list_sheets":
         return {"sheets": [{"name": s, "rows": len(df), "columns": [str(c) for c in df.columns]}
                            for s, df in dataset["sheets"].items()]}
+    if name == "bar_chart" and args.get("values") is not None:
+        # independent mode: the model charts its own computed numbers — no sheet needed
+        vals = args["values"]
+        labs = args.get("labels")
+        if not isinstance(vals, (list, tuple)):
+            vals = [vals]
+        if not isinstance(labs, (list, tuple)) or labs is None:
+            labs = [labs] if labs else [str(i + 1) for i in range(len(vals))]
+        return points_chart(labs, vals, args.get("title"), to_int(args.get("n"), 15))
     df = get_sheet(dataset, args.get("sheet", ""))
     if name == "summarize":
         if args.get("column"):

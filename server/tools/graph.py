@@ -11,13 +11,13 @@ def _num(v):
     return int(f) if f.is_integer() else round(f, 2)
 
 
-def _chart(pairs, label_name, value_name, total, n):
+def _chart(pairs, label_name, value_name, total, n, title=None):
     pairs = pairs[:min(int(n), _MAX_ROWS)]
-    spec = {"type": "bar", "title": f"{value_name} by {label_name}",
+    spec = {"type": "bar", "title": title or f"{value_name} by {label_name}",
             "labels": [str(lab) for lab, _ in pairs],
             "values": [_num(v) for _, v in pairs]}
     if len(pairs) < total:
-        spec["note"] = f"top {len(pairs)} of {total}"
+        spec["note"] = f"showing {len(pairs)} of {total}"
     return {"chart": spec}
 
 
@@ -25,6 +25,17 @@ def _sorted(labels, vals, ascending):
     d = pd.DataFrame({"label": labels.astype(str).str.replace("|", "/", regex=False),
                       "v": pd.to_numeric(vals, errors="coerce")}).dropna()
     return list(d.sort_values("v", ascending=ascending).itertuples(index=False, name=None)), len(d)
+
+
+def points_chart(labels, values, title=None, n=15):
+    """Chart caller-supplied label/value pairs — the model's own computed results, not sheet data.
+    Order is preserved (the caller already ranked); zip() truncates to the shorter array."""
+    d = pd.DataFrame({"label": [str(l).replace("|", "/") for l, _ in zip(labels, values)],
+                      "v": pd.to_numeric([v for _, v in zip(labels, values)], errors="coerce")}).dropna()
+    if d.empty:
+        raise ValueError("No numeric values to chart — pass numbers in 'values'.")
+    pairs, total = list(d.itertuples(index=False, name=None)), len(d)
+    return _chart(pairs, "label", "value", total, n, title=title or "Chart")
 
 
 def bar_chart(df, label_col=None, value_col=None, n=15, ascending=False, op=None):
