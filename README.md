@@ -29,7 +29,7 @@ Requirements: **Python 3.10+**, **Node.js 20+**, **curl**. Linux x86_64 and macO
 ./start.sh
 ```
 
-That's it. On first run it downloads the model (~1.5 GB, sha256-verified) from this repo's GitHub Releases, installs dependencies, builds the UI, starts `llama-server` on `127.0.0.1:2828`, and serves the app at **http://localhost:2424**. Later runs skip everything that's already done.
+That's it. On first run it downloads the model (~1.5 GB, sha256-verified) from this repo's GitHub Releases, installs dependencies, builds the UI, starts `llama-server` on `127.0.0.1:2828`, and serves the app at **http://localhost:2424**.
 
 Try it with a sample: `client/public/samples/bicol_university_grades.xlsx` — drag it onto the chat window and ask a question.
 
