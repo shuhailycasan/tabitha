@@ -5,7 +5,7 @@ A web app where teachers upload an Excel file and chat with a local LLM about it
 ## Stack
 
 - Backend: Python 3.13 (Windows) + Flask + pandas + openpyxl + openai SDK.
-- Frontend: Vue 3 global build, vendored in `static/vendor/`, no build step.
+- Frontend: Vue 3 global build, vendored in `client/vendor/`, no build step.
 - LLM: MiniCPM5-2B at `http://192.168.0.159:2828/v1`, OpenAI-compatible.
 
 ## Why fixed tools
@@ -26,11 +26,11 @@ The model answers from the small results.
 
 ## Files
 
-- `app.py` — Flask app: `POST /api/upload`, `GET /api/datasets`, `POST /api/chat`.
+- `server/app.py` — Flask app: `POST /api/upload`, `GET /api/datasets`, `POST /api/chat`.
 - `templates/index.html` — Vue 3 page: dataset sidebar, chat panel.
-- `static/vendor/vue.global.prod.js` — vendored Vue.
+- `client/vendor/vue.global.prod.js` — vendored Vue.
 - `uploads/` — saved Excel files; DataFrames held in memory.
-- `sample_grades.xlsx` — test fixture.
+- `data/sample_grades.xlsx` (+ `sample_attendance.xlsx`, `sample_tests.xlsx`) — test fixtures.
 
 ## Design
 

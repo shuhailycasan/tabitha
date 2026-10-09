@@ -84,11 +84,21 @@
   .msg.user { align-self: flex-end; background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; }
   .msg.bot { align-self: flex-start; background: var(--muted); border-bottom-left-radius: 4px; }
   .msg.bot:has(table) { max-width: 100%; }
-  .tablewrap { overflow-x: auto; margin: 6px 0; white-space: normal; }
-  .msg table { border-collapse: collapse; font-size: 14px; background: var(--card); }
-  .msg th, .msg td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
-  .msg th { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+  .tablewrap {
+    overflow: auto; max-height: 340px; margin: 8px 0; white-space: normal;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+  }
+  .msg table { border-collapse: separate; border-spacing: 0; font-size: 13px; width: 100%; }
+  .msg th, .msg td { padding: 7px 14px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  .msg th {
+    position: sticky; top: 0; z-index: 1; background: var(--primary); color: var(--on-primary);
+    font-weight: 600; font-size: 12px; letter-spacing: .02em;
+  }
+  .msg td.num, .msg th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .msg tbody tr:nth-child(even) { background: var(--bg); }
+  .msg tbody tr:hover { background: var(--muted); }
+  .msg tbody tr:last-child td { border-bottom: 0; }
+  .msg td:first-child { font-weight: 600; }
   .toolchip {
     align-self: flex-start; font-size: 12px; color: var(--muted-fg);
     background: var(--card); border: 1px solid var(--border);
@@ -103,7 +113,18 @@
   }
   .suggest button:hover { border-color: var(--primary); color: var(--primary); }
 
-  .composer { display: flex; gap: 8px; margin-top: 12px; }
+  .composer { display: flex; gap: 8px; margin-top: 12px; position: relative; }
+  .ac {
+    position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; z-index: 10;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,.1); min-width: 240px; overflow: hidden;
+  }
+  .ac button {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    width: 100%; border: 0; background: none; padding: 8px 12px; text-align: left; font-size: 14px;
+  }
+  .ac button.on, .ac button:hover { background: var(--muted); }
+  .ac small { color: var(--muted-fg); }
   .composer textarea {
     flex: 1; resize: none; font: inherit; padding: 10px 12px; min-height: 44px;
     border: 1px solid var(--border); border-radius: var(--radius); background: var(--card);
@@ -188,7 +209,7 @@
     </section>
 
     <section class="card chat" aria-label="Chat">
-      <div class="chat-log" ref="log" aria-live="polite">
+      <div class="chat-log" ref="log" aria-live="polite" @scroll.passive="onLogScroll">
         <div v-if="!selectedId" class="empty">
           <p>Upload a spreadsheet on the left to start.</p>
         </div>
@@ -217,11 +238,17 @@
       <label class="hint toggle"><input type="checkbox" v-model="think" :disabled="sending">
         Think step by step <span>({{ think ? 'slower, more careful, shows reasoning' : 'fast mode, about 4x quicker' }})</span></label>
       <form class="composer" @submit.prevent="send">
+        <div v-if="ac" class="ac">
+          <button v-for="(it, i) in ac.items" :key="it.label" type="button"
+                  :class="{ on: i === ac.i }" @mousedown.prevent="pick(it)">
+            <span>{{ it.label }}</span><small>{{ it.hint }}</small>
+          </button>
+        </div>
         <label for="chat-input" class="hint" style="position:absolute;left:-9999px">Message</label>
-        <textarea id="chat-input" v-model="input" rows="1" required
-                  :placeholder="selectedId ? 'Ask about the data…' : 'Upload a file first'"
-                  :disabled="!selectedId || sending"
-                  @keydown.enter.exact.prevent="send"></textarea>
+        <textarea id="chat-input" ref="ta" v-model="input" rows="1" required
+                  :placeholder="selectedId ? 'Ask about the data… (@file to combine, / for instant commands)' : 'Upload a file first'"
+                  :disabled="!selectedId"
+                  @input="onComposerInput" @keydown="onKey"></textarea>
         <button v-if="sending" class="send cancel" type="button" @click="cancel" aria-label="Stop generating">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z"/>
@@ -241,11 +268,23 @@
 <script>
 const { createApp, nextTick } = Vue;
 
+const COMMANDS = [
+  { label: '/list', hint: 'rows as a table — /list [sheet] [n]' },
+  { label: '/stats', hint: 'stats — /stats, /stats <column>, /stats <sheet> <column>' },
+  { label: '/top', hint: 'highest rows — /top <column> [n]' },
+  { label: '/bottom', hint: 'lowest rows — /bottom <column> [n]' },
+  { label: '/lookup', hint: 'find a name in every sheet — /lookup <name>' },
+  { label: '/think', hint: 'turn step-by-step thinking on' },
+  { label: '/fast', hint: 'turn thinking off (about 4x quicker)' },
+  { label: '/clear', hint: 'clear this chat' },
+  { label: '/help', hint: 'show these commands' },
+];
+
 createApp({
   data() {
     return {
       datasets: [], selectedId: null,
-      messages: [], input: '', sending: false, abortCtrl: null, status: '', think: true,
+      messages: [], input: '', sending: false, abortCtrl: null, status: '', think: true, ac: null, stick: true,
       uploading: false, uploadError: '', chatError: '', dragover: false,
       suggestions: [
         'How many students are there?',
@@ -287,6 +326,120 @@ createApp({
       if (this.selectedId === id) { this.selectedId = this.datasets[0]?.id || null; this.messages = []; }
     },
     ask(q) { this.input = q; this.send(); },
+    stem(n) { return n.replace(/\.[^.]+$/, ''); },
+    scopeIds(text) {  // selected dataset + any @file mentions
+      const ids = this.selectedId ? [this.selectedId] : [];
+      for (const m of text.matchAll(/@(\S+)/g)) {
+        const d = this.datasets.find(d => this.stem(d.name).toLowerCase() === m[1].toLowerCase());
+        if (d && !ids.includes(d.id)) ids.push(d.id);
+      }
+      return ids;
+    },
+    argPool(cmd) {  // 2nd-stage suggestions: sheets/columns of the in-scope files
+      const ds = this.scopeIds(this.input).map(i => this.datasets.find(d => d.id === i)).filter(Boolean);
+      const quote = s => /\s/.test(s) ? `"${s}"` : s;
+      const sheets = ds.flatMap(d => d.sheets.map(s => quote(s.name)));
+      const cols = ds.flatMap(d => d.sheets.flatMap(s => s.columns.map(quote)));
+      if (cmd === '/list' || cmd === '/stats') return [...sheets, ...cols];
+      if (cmd === '/top' || cmd === '/bottom') return cols;
+      return [];
+    },
+    onComposerInput(e) {
+      const pos = e.target.selectionStart, before = this.input.slice(0, pos);
+      const m = before.match(/(?:^|\s)(\S*)$/);
+      this.ac = null;
+      if (!m) return;
+      const word = m[1], tokenStart = pos - word.length;
+      if (word.startsWith('@')) {
+        const items = this.datasets.map(d => '@' + this.stem(d.name))
+          .filter(l => l.toLowerCase().includes(word.toLowerCase()));
+        if (items.length) this.ac = { items: items.map(l => ({ label: l, hint: 'include this file' })), i: 0, tokenStart, pos };
+        return;
+      }
+      const head = before.slice(0, tokenStart).trim();
+      if (word.startsWith('/') && !head) {
+        const items = COMMANDS.filter(c => c.label.includes(word.toLowerCase()));
+        if (items.length) this.ac = { items, i: 0, tokenStart, pos };
+        return;
+      }
+      if (head.startsWith('/')) {
+        const pool = this.argPool(head.split(/\s+/)[0]);
+        const items = pool.filter(l => l.toLowerCase().includes(word.toLowerCase()));
+        if (items.length) this.ac = { items: items.map(l => ({ label: l, hint: 'column / sheet' })), i: 0, tokenStart, pos };
+      }
+    },
+    onKey(e) {
+      const only = this.ac && this.ac.items.length === 1 && this.ac.items[0].label === this.input.slice(this.ac.tokenStart, this.ac.pos);
+      if (only) this.ac = null;  // already typed in full: Enter should send, not re-pick
+      if (this.ac) {
+        if (e.key === 'ArrowDown') { this.ac.i = (this.ac.i + 1) % this.ac.items.length; return e.preventDefault(); }
+        if (e.key === 'ArrowUp') { this.ac.i = (this.ac.i - 1 + this.ac.items.length) % this.ac.items.length; return e.preventDefault(); }
+        if (e.key === 'Enter' || e.key === 'Tab') { this.pick(this.ac.items[this.ac.i]); return e.preventDefault(); }
+        if (e.key === 'Escape') { this.ac = null; return; }
+      }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); }
+    },
+    pick(item) {
+      this.input = this.input.slice(0, this.ac.tokenStart) + item.label + ' ' + this.input.slice(this.ac.pos);
+      const p = this.ac.tokenStart + item.label.length + 1;
+      this.ac = null;
+      nextTick(() => { this.$refs.ta.focus(); this.$refs.ta.setSelectionRange(p, p); });
+    },
+    defaultSheet(ids) {
+      const d = this.datasets.find(x => x.id === ids[ids.length - 1]);  // last = the @mentioned file, else the selected one
+      return d && d.sheets[0] && d.sheets[0].name;
+    },
+    inScope(ids) { return ids.map(i => this.datasets.find(d => d.id === i)).filter(Boolean); },
+    isSheet(ids, name) {
+      return String(name).toLowerCase() === 'all' ||
+        this.inScope(ids).some(d => d.sheets.some(s => s.name.toLowerCase() === String(name).toLowerCase()));
+    },
+    findSheet(ids, col) {  // first in-scope sheet holding this column
+      for (const d of this.inScope(ids))
+        for (const s of d.sheets)
+          if (s.columns.some(c => c.toLowerCase() === String(col || '').toLowerCase())) return s.name;
+      return null;
+    },
+    sys(t) { this.messages.push({ role: 'assistant', content: t }); this.scroll(); },
+    async command(text) {  // /commands run the tools directly — no LLM wait
+      const parts = text.match(/"[^"]*"|\S+/g) || [];
+      const cmd = parts[0], rest = parts.slice(1).filter(p => !p.startsWith('@')).map(p => p.replace(/^"|"$/g, ''));  // @file is scope, not an argument
+      const ids = this.scopeIds(text);
+      this.input = ''; this.chatError = ''; this.ac = null;
+      const local = {
+        '/clear': () => { this.messages = []; },
+        '/fast': () => { this.think = false; this.sys('Fast mode on — answers skip the thinking step.'); },
+        '/think': () => { this.think = true; this.sys('Thinking mode on — slower, shows reasoning.'); },
+        '/help': () => { this.sys(COMMANDS.map(c => `**${c.label}** — ${c.hint}`).join('\n') + '\n\nTip: `@file` pulls another uploaded file into the question.'); },
+      };
+      const specs = {
+        '/list': { tool: 'list_rows', args: () => /^\d+$/.test(rest[0] || '')
+            ? { sheet: this.defaultSheet(ids), limit: +rest[0] }
+            : { sheet: rest[0] || this.defaultSheet(ids), limit: +rest[1] || 30 } },
+        '/stats': { tool: 'summarize', args: () => this.isSheet(ids, rest[0])
+            ? { sheet: rest[0], column: rest[1] }
+            : { sheet: this.findSheet(ids, rest[0]) || this.defaultSheet(ids), column: rest[0] } },
+        '/lookup': { tool: 'lookup', args: () => ({ name: rest.join(' ') }) },
+        '/top': { tool: 'top_rows', args: () => ({ sheet: this.findSheet(ids, rest[0]) || this.defaultSheet(ids), column: rest[0], n: +rest[1] || 5 }) },
+        '/bottom': { tool: 'top_rows', args: () => ({ sheet: this.findSheet(ids, rest[0]) || this.defaultSheet(ids), column: rest[0], n: +rest[1] || 5, ascending: true }) },
+      };
+      if (local[cmd]) { local[cmd](); return; }
+      const spec = specs[cmd];
+      if (!spec) { this.sys(`Unknown command \`${cmd}\` — try /help`); return; }
+      if (!ids.length) { this.sys('Select a file on the left (or @mention one) before running commands.'); return; }
+      const args = spec.args();
+      Object.keys(args).forEach(k => args[k] === undefined && delete args[k]);
+      this.messages.push({ role: 'user', content: text });
+      this.scroll(true);
+      try {
+        const res = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataset_ids: ids, tool: spec.tool, args }) });
+        const data = await res.json();
+        this.messages.push({ role: 'assistant', content: data.ok ? data.text : `Error: ${data.error}`,
+          tool_log: [{ tool: spec.tool, args, ok: data.ok }] });
+      } catch (e) { this.chatError = e.message + ' — try again.'; }
+      this.scroll();
+    },
     shortArgs(args) {
       return Object.entries(args || {}).map(([k, v]) => `${k}=${v}`).join(', ');
     },
@@ -298,33 +451,43 @@ createApp({
       for (let i = 0; i < L.length;) {
         if (row(L[i]) && i + 1 < L.length && /^\s*\|[\s:|-]+\|\s*$/.test(L[i + 1])) {
           const head = cells(L[i]); i += 2;
-          let body = '';
-          while (i < L.length && row(L[i])) body += '<tr>' + cells(L[i++]).map(c => `<td>${c}</td>`).join('') + '</tr>';
-          out.push(`<div class="tablewrap"><table><thead><tr>${head.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`);
+          const rows = [];
+          while (i < L.length && row(L[i])) rows.push(cells(L[i++]));
+          const numCol = head.map((_, j) => rows.length && rows.every(r => !r[j] || /^-?[\d,.]+%?$/.test(r[j])));  // right-align columns that are all numbers
+          const body = rows.map(r => '<tr>' + r.map((c, j) => `<td${numCol[j] ? ' class="num"' : ''}>${c}</td>`).join('') + '</tr>').join('');
+          out.push(`<div class="tablewrap"><table><thead><tr>${head.map((c, j) => `<th${numCol[j] ? ' class="num"' : ''}>${c}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`);
         } else out.push(L[i++]);
       }
       return out.join('\n').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     },
     async send() {
       const text = this.input.trim();
-      if (!text || !this.selectedId || this.sending) return;
+      if (!text) return;
+      if (this.sending) this.cancel();  // interrupt: abandoning the in-flight request
+      if (text.startsWith('/')) return this.command(text);
+      const ids = this.scopeIds(text);
+      if (!ids.length) return;
       this.input = ''; this.chatError = ''; this.sending = true; this.status = 'Thinking…';
       this.abortCtrl = new AbortController();
-      this.reqId = crypto.randomUUID();
+      const myReq = this.reqId = crypto.randomUUID();
+      const clean = text.replace(/@(\S+)/g, (m, s) => {   // @file becomes a quoted name — scope, not a student
+        const d = this.datasets.find(d => this.stem(d.name).toLowerCase() === s.toLowerCase());
+        return d ? `the file "${d.name}"` : m;
+      }).replace(/\s{2,}/g, ' ').trim() || 'Summarize this data';
       this.messages.push({ role: 'user', content: text });
       this.messages.push({ role: 'assistant', content: '', tool_log: [], think: '' });
       const pending = this.messages[this.messages.length - 1];  // reactive proxy — mutating the raw object would not re-render
-      this.scroll();
+      this.scroll(true);  // sending a message jumps to the bottom; after that, only follow if the user stays there
       try {
         const res = await fetch('/api/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           signal: this.abortCtrl.signal,
           body: JSON.stringify({
-            dataset_id: this.selectedId,
+            dataset_ids: ids,
             request_id: this.reqId,
             think: this.think,
-            messages: this.messages.filter(m => m !== pending)
-              .map(m => ({ role: m.role, content: m.content })),
+            messages: [...this.messages.filter(m => m !== pending).map(m => ({ role: m.role, content: m.content })).slice(0, -1),
+              { role: 'user', content: clean }],
           }),
         });
         if (!res.ok) {
@@ -357,13 +520,19 @@ createApp({
         if (idx >= 0) this.messages.splice(idx, 1);
         if (e.name !== 'AbortError') this.chatError = e.message + ' — try again.';
       }
-      this.sending = false; this.abortCtrl = null; this.status = ''; this.scroll();
+      if (this.reqId === myReq) { this.sending = false; this.abortCtrl = null; this.status = ''; }  // an interrupted old request must not reset the new one's state
+      this.scroll();
     },
     cancel() {
       if (this.abortCtrl) this.abortCtrl.abort();
       if (this.reqId) fetch('/api/cancel/' + this.reqId, { method: 'POST' });
     },
-    scroll() { nextTick(() => { const el = this.$refs.log; if (el) el.scrollTop = el.scrollHeight; }); },
+    onLogScroll(e) { const el = e.target; this.stick = el.scrollHeight - el.scrollTop - el.clientHeight < 60; },  // false once the user scrolls up to read
+    scroll(force) {
+      if (force) this.stick = true;
+      if (!this.stick) return;
+      nextTick(() => { const el = this.$refs.log; if (el) el.scrollTop = el.scrollHeight; });
+    },
     scrollThink() {
       nextTick(() => {
         const refs = this.$refs.thinkbox;
