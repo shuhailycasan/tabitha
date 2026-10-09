@@ -6,6 +6,8 @@
 
 Tabitha is a local AI assistant that lets you talk to your spreadsheets. Upload a gradebook, an attendance sheet, or a test record, and just ask: *"Who has the best average?"*, *"How many students were absent more than 10 days?"*, *"Chart the grades per section."* Tabitha reads the actual data, computes real answers, and replies with tables and charts — no formulas to remember, no menus to dig through.
 
+![Tabitha in action — chatting about a test-scores workbook](readmesrc/screenshot.png)
+
 ## Why local?
 
 We believe AI belongs in everyone's hands — not behind a subscription, an API key, or an internet connection. This technology should make people's lives easier, and it can't do that if your data has to leave your device to use it.
