@@ -61,25 +61,6 @@ flowchart LR
 - **`vendor/llama/`** holds the bundled `llama-server` binaries. It is not committed to git. If it is missing, `start.sh` fetches the official llama.cpp release.
 - **`models/`** holds the GGUF weights. It is not committed to git. `start.sh` downloads it from GitHub Releases.
 
-### Server request flow
-
-This diagram shows how an uploaded file and a chat question travel through the Flask backend:
-
-```mermaid
-flowchart TD
-    U["POST /api/upload<br>.xlsx / .csv"] --> L["load_sheets()<br>each sheet → pandas DataFrame"]
-    L --> DS[("DATASETS<br>in-memory store")]
-    C["POST /api/chat<br>messages · dataset_ids · think"] --> CD["combined_dataset(ids)<br>pool sheets from all files<br>(clashes get a [file] suffix)"]
-    DS --> CD
-    CD --> SP["system_prompt(dataset)<br>live column + sheet stats"]
-    CD --> CH["compact_history()<br>drop oldest turns past 60% ctx"]
-    SP --> SE["stream_events()<br>agentic tool loop"]
-    CH --> SE
-    SE ==>|"status · ctx · think · tool · delta · chart · done"| UI["NDJSON → client"]
-    R["POST /api/run<br>/commands, no LLM"] --> RT["run_tool()"]
-    RT --> MD["md_result() → JSON → client"]
-```
-
 ## The model
 
 | | |
@@ -106,28 +87,22 @@ Tabitha is not a one-shot prompt. The backend runs an agent loop (`server/chat.p
 - **Interruption.** The Stop button, or pressing Enter twice, cancels mid-stream (`/api/cancel/<req_id>`) and keeps whatever already streamed.
 - **Per-turn timer.** Each reply shows live elapsed time while it generates and the total once done.
 
-### The tool loop
+### The agentic loop
+
+This is the full path of one question, from the user to the server and back:
 
 ```mermaid
-sequenceDiagram
-    participant UI as Client (Vue)
-    participant F as Flask · /api/chat
-    participant L as llama-server · MiniCPM5-2B
-    participant T as run_tool() · pandas
-
-    UI->>F: POST /api/chat (messages, dataset_ids, think)
-    F->>F: system prompt + compact history (≤60% ctx)
-    loop up to 8 rounds
-        F->>L: chat.completions (stream + tool defs)
-        L-->>UI: think / delta → NDJSON to client
-        L-->>F: finish with tool_call(s)
-        F-->>UI: tool chip event
-        F->>T: run_tool(name, args)
-        T-->>F: rows / stats / chart / error
-        F-->>UI: chart event (if any)
-        Note over F,L: results appended → next round
-    end
-    F-->>UI: done (reply + ctx usage)
+flowchart TD
+    A(["User asks a question<br>@mentions pick the files"]) --> B["POST /api/chat<br>messages · dataset_ids · think"]
+    B --> C["Server builds the prompt:<br>system prompt from live sheet info<br>+ history compacted to 60% ctx"]
+    C --> D["llama-server streams a completion<br>think and delta events go to the UI"]
+    D --> E{Assistant called<br>a tool?}
+    E -- "yes" --> F["run_tool(name, args)<br>pandas over the DataFrames"]
+    F --> G["tool chips + charts go to the UI<br>results appended to messages"]
+    G --> H{"same call repeated,<br>cancelled, or round 8?"}
+    H -- "no, next round" --> D
+    H -- "yes" --> Z(["done event to the UI<br>reply + ctx usage"])
+    E -- "no, final answer" --> Z
 ```
 
 Identical repeated calls are steered back once ("you already have this result"), then the loop gives up gracefully. This is a known failure mode of small models. `Steer` errors reach the model but never appear in the user's tool chips.
