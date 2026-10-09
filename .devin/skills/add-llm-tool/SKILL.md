@@ -24,7 +24,7 @@ Reuse the helpers:
 
 - `get_sheet(dataset, name)` — case-insensitive; falls back to the only sheet. Never index `dataset["sheets"][name]` directly.
 - `get_col(df, name)` — exact / case+space-insensitive / unique-substring match; raises `ValueError` listing columns.
-- `md_table(df, total)` — ready-made markdown table string. For "show/list/table" style output return this and tell the prompt to paste it verbatim (a 2B model copies a table far better than it builds one from JSON). The UI's `md()` in `client/index.html` renders `**bold**` and `| tables |` only.
+- `md_table(df, total)` — ready-made markdown table string. For "show/list/table" style output return this and tell the prompt to paste it verbatim (a 2B model copies a table far better than it builds one from JSON). The UI's `md()` in `client/src/feature/chat/engine.js` renders `**bold**` and `| tables |` only.
 - `rows_json(df, limit)` — rows output, capped at 100. `holders(df, col, value)` — names of who holds a value.
 - Return answer-ready dicts (counts, who, mean) so the model needs ONE call, not a chain. Raise `ValueError` for bad input — the route feeds it back as a tool result.
 

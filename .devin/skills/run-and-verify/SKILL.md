@@ -24,7 +24,7 @@ Model: `models/MiniCPM5-2B-Q4_K_M.gguf` (2B model, ~8 tok/s — expect slow, sim
 python server/app.py
 ```
 
-Serves `client/index.html` at http://localhost:8777 (Vue frontend, vendored in `client/vendor/` — no build step, no npm).
+Serves the built Vue frontend at http://localhost:8777 — run `cd client && npm run build` first (output: `client/dist/`). For UI work, `cd client && npm run dev` runs Vite on :5173 with `/api` proxied to Flask on :8777.
 
 ## 3. Smoke test (this is the project's runnable check)
 
