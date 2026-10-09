@@ -6,7 +6,7 @@ import { files } from '../feature/files/engine.js'
 const props = defineProps({
   item: { type: Object, required: true },
 })
-const emit = defineEmits(['open', 'drop-on-chat'])
+const emit = defineEmits(['open', 'drop-on-chat', 'remove'])
 
 const el = ref(null)
 
@@ -31,6 +31,10 @@ function onPointerDown(e) {
     @pointerdown="onPointerDown"
     @dblclick="item.fresh = false; emit('open', item)"
   >
+    <button
+      class="icon-del" aria-label="Remove file" title="Remove"
+      @click.stop="emit('remove', item)" @dblclick.stop
+    >×</button>
     <span class="desk-icon-img">
       <svg viewBox="0 0 24 24"><path d="M4 4.5h9l6 6v9A1.5 1.5 0 0 1 17.5 21h-12A1.5 1.5 0 0 1 4 19.5v-15Z"/><path d="M13 5v6h6M8 14l4 5m0-5-4 5"/></svg>
     </span>
