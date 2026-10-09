@@ -84,12 +84,13 @@ flowchart TD
 
 | | |
 |---|---|
-| **Model** | [MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) (OpenBMB) |
+| **Model** | MiniCPM5-2B — 2B parameters |
+| **Creator** | [OpenBMB](https://huggingface.co/openbmb) — original model: [huggingface.co/openbmb/MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) |
 | **File** | `MiniCPM5-2B-Q4_K_M.gguf` — ~1.5 GB, Q4_K_M quantization |
 | **Runtime** | llama.cpp `llama-server` (build b11527), vendored for offline dev |
 | **Context** | 16,384 tokens, single slot (`-c 16384 -np 1`) |
 | **Reasoning** | Native thinking mode; exposed as the **Deep Think** toggle, capped by `THINK_BUDGET` |
-| **Source** | This repo's [GitHub Releases](https://github.com/shuhailycasan/tabitha/releases/tag/Model); sha256 pinned in `start.sh` |
+| **Download** | This repo's [GitHub Releases](https://github.com/shuhailycasan/tabitha/releases/tag/Model) (mirror); sha256 pinned in `start.sh` |
 
 A 2B model is small, so the server does a lot of quiet correction on its behalf: lenient argument coercion (`"5"` → `5`, `"false"` → `false`), loop detection when it repeats an identical call, one retry on empty replies, and `Steer` errors that are sent back to the model but hidden from the user.
 
