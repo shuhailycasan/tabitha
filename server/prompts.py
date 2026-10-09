@@ -38,7 +38,7 @@ def system_prompt(dataset):
         "- per section/class/category totals, which group has the most X -> group_stats\n"
         "- everything about one student -> lookup\n"
         "- list / show students or rows, or any request for a table -> list_rows, then paste its table into your answer exactly as given\n"
-        "- bar graph / chart / plot / visualize a column -> bar_chart, then paste its chart into your answer exactly as given\n"
+        "- bar graph / chart / plot / visualize, incl. counts or averages per category -> bar_chart, then paste its chart into your answer exactly as given\n"
         + merge_rule +
         "- any other arithmetic -> compute\n\n"
         "RULES:\n"

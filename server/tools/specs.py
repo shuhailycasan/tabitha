@@ -52,15 +52,18 @@ TOOLS = [
          "ascending": _ASC},
         ["sheet", "by"]),
     _fn("bar_chart",
-        "Draw a bar chart of one numeric column (top N rows, sorted). Labels come from 'by' or the first column. "
+        "Draw a bar chart. Numeric 'column' -> top-N bars per row. 'by' alone or op 'count' -> count rows per "
+        "category (e.g. how many Present vs Absent). 'by' + 'column' + op avg/sum/min/max -> aggregate per group. "
         "Returns a ready-made chart — paste it into your answer exactly as given, keep the | pipes. "
-        "Use for: bar graph, chart, plot, visualize, graph the scores/values, compare values as bars.",
+        "Use for: bar graph, chart, plot, visualize, count per category, average per group, compare values as bars.",
         {"sheet": _SHEET,
-         "column": {**_COL, "description": "Numeric column for the bar heights"},
-         "by": {**_COL, "description": "Optional label column for each bar. Omit for the first column (usually names)."},
+         "column": {**_COL, "description": "Numeric column for bar heights. Omit for a count-per-'by' chart."},
+         "by": {**_COL, "description": "Category/label column. Omit for the first column (usually names)."},
+         "op": {"type": "string", "enum": ["count", "avg", "sum", "min", "max"],
+                "description": "Optional. Aggregate 'column' per 'by' group; 'count' ignores 'column'."},
          "n": {"type": "integer", "description": "How many bars (default 15, max 25)"},
          "ascending": _ASC},
-        ["sheet", "column"]),
+        ["sheet"]),
     _fn("lookup",
         "Everything about one person/item: finds rows matching a name in EVERY sheet. "
         "Use for: how is Liam doing, tell me about Ana, Gia's grades and attendance.",

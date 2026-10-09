@@ -44,9 +44,9 @@ def run_tool(dataset, name, args):
             out = out.sort_values(get_col(df, args["sort_by"]), ascending=bool(args.get("ascending", True)))
         return {"table": md_table(out.head(min(int(args.get("limit") or 30), 50)), len(out))}
     if name == "bar_chart":
-        val = get_col(df, args.get("column", ""))
+        val = get_col(df, args["column"]) if args.get("column") else None
         lab = get_col(df, args["by"]) if args.get("by") else df.columns[0]
-        return bar_chart(df, lab, val, args.get("n") or 15, bool(args.get("ascending", False)))
+        return bar_chart(df, lab, val, args.get("n") or 15, bool(args.get("ascending", False)), args.get("op"))
     if name == "top_rows":
         col = get_col(df, args["column"])
         return rows_json(df.sort_values(col, ascending=bool(args.get("ascending", False))), args.get("n", 5))
