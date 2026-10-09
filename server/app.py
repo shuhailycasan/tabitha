@@ -106,7 +106,31 @@ def safe_eval(expr):
     return ev(ast.parse(str(expr), mode="eval").body)
 
 
+def joinable(dataset):
+    """Largest group of sheets sharing one first column — the sheets 'all' can merge."""
+    groups = {}
+    for name, df in dataset["sheets"].items():
+        groups.setdefault(str(df.columns[0]), []).append((name, df))
+    key, group = max(groups.items(), key=lambda kv: len(kv[1]))
+    return (key, group) if len(group) > 1 else None
+
+
+def merged_all(dataset):
+    """Outer-merge the joinable sheets on their shared first column; colliding columns get a [sheet] suffix."""
+    found = joinable(dataset)
+    if not found:
+        raise ValueError("Sheets can't be combined — no two sheets share the same first column.")
+    key, group = found
+    out = None
+    for name, df in group:
+        d = df.rename(columns={c: f"{c} [{name}]" for c in df.columns if str(c) != key})
+        out = d if out is None else out.merge(d, on=key, how="outer")
+    return out
+
+
 def get_sheet(dataset, name):
+    if str(name).lower() in ("all", "combined", "everything"):
+        return merged_all(dataset)
     sheets = dataset["sheets"]
     if name in sheets:
         return sheets[name]
@@ -135,7 +159,12 @@ def rows_json(df, limit):
 
 
 def md_table(df, total):
-    cell = lambda v: "" if pd.isna(v) else str(v.item() if hasattr(v, "item") else v).replace("|", "/")
+    def cell(v):
+        if isinstance(v, (list, tuple)):
+            v = ", ".join(map(str, v))
+        elif pd.isna(v):
+            return ""
+        return str(v.item() if hasattr(v, "item") else v).replace("|", "/")
     rows = [f"| {' | '.join(map(str, df.columns))} |", "|" + "---|" * len(df.columns)]
     rows += [f"| {' | '.join(cell(v) for v in r)} |" for r in df.itertuples(index=False)]
     if len(df) < total:
@@ -157,9 +186,16 @@ def summarize_col(df, col):
     return {"count": int(s.notna().sum()), "unique": int(s.nunique()), "top_values": s.value_counts().head(5).to_dict()}
 
 
+class Steer(ValueError):
+    """Model-steering error: sent back to the model, but hidden from the user's tool chips."""
+
+
 def run_tool(dataset, name, args):
     if name == "lookup":
         needle = str(args.get("name", "")).strip()
+        labels = {n.lower() for f in dataset.get("files", []) for n in (f, Path(f).stem)} | {s.lower() for s in dataset["sheets"]}
+        if needle.lower() in labels:
+            raise Steer(f"'{needle}' is a file/sheet name, not a person. Use sheet 'all' with list_rows or summarize to show the combined data.")
         out = {}
         for sheet, df in dataset["sheets"].items():
             text = df.select_dtypes(exclude="number")
@@ -220,6 +256,14 @@ def system_prompt(dataset):
                 parts.append(f"{c} (text, e.g. {', '.join(map(str, df[c].dropna().head(2)))})")
         return ", ".join(parts)
     sheets = "\n".join(f"- {s} ({len(df)} rows): {describe(df)}" for s, df in dataset["sheets"].items())
+    merge_rule = ""
+    found = dataset.get("multi") and joinable(dataset)  # merged view only when the user explicitly combines files via @
+    if found:
+        key, group = found
+        cols = [key] + [f"{c} [{s}]" for s, df in group for c in df.columns if str(c) != key]
+        sheets += f"\n- All ({len(group)} sheets merged on {key}): {', '.join(cols)}"
+        sheets += f"\n(The teacher combined these files: {', '.join(dataset['files'])}. A file name in the question just means 'use that file' — it is not something to search for.)"
+        merge_rule = "- any question mixing columns from different sheets -> use sheet \"all\" on any tool\n"
     return (
         f"You are a data assistant for a teacher. The teacher uploaded '{dataset['name']}'.\n\n"
         f"DATA (already loaded, never look up the structure):\n{sheets}\n\n"
@@ -230,14 +274,75 @@ def system_prompt(dataset):
         "- each student's average or total across several columns -> row_stats\n"
         "- everything about one student -> lookup\n"
         "- list / show students or rows, or any request for a table -> list_rows, then paste its table into your answer exactly as given\n"
+        + merge_rule +
         "- any other arithmetic -> compute\n\n"
         "RULES:\n"
         "- Think in 2-3 short sentences, then call ONE tool. Do not plan every step in advance.\n"
         "- Use sheet and column names exactly as in DATA.\n"
+        "- File and sheet names are data structure, never people — do not pass them to lookup or filter_rows as values.\n"
         "- Every number and name in your answer must come from a tool result. Never calculate in your head.\n"
+        "- Questions about what data or combinations are possible -> answer directly from the DATA list above. Name the actual columns and give an example question. Never reply with only a clarifying question.\n"
         "- You CAN show tables: write them as markdown tables. Never say you are unable to display data.\n"
         "- Otherwise answer in 1-3 plain sentences. Name the students and give the numbers."
     )
+
+
+def combined_dataset(ids):
+    """Merge datasets by id into one virtual dataset; sheet-name clashes get a [file] suffix."""
+    sheets, names, used = {}, [], set()
+    for i in ids:
+        ds = DATASETS.get(i)
+        if ds is None:
+            return None
+        names.append(ds["name"])
+        stem = Path(ds["name"]).stem
+        for s, df in ds["sheets"].items():
+            key = s if s not in used else f"{s} [{stem}]"
+            used.add(key)
+            sheets[key] = df
+    return {"name": " + ".join(names), "sheets": sheets, "multi": len(ids) > 1, "files": names}
+
+
+def md_result(result):
+    """Render any tool result as markdown so /commands can show it without the LLM."""
+    def table(rows):
+        return md_table(pd.DataFrame(rows), len(rows))
+    if isinstance(result, dict):
+        if "table" in result:
+            return result["table"]
+        if isinstance(result.get("rows"), list) and result["rows"] and isinstance(result["rows"][0], dict):
+            head = f"**{result['matches']} match(es)**\n\n" if "matches" in result else ""
+            return head + table(result["rows"])
+        scalars = [f"**{k}:** {v}" for k, v in result.items() if not isinstance(v, (dict, list))]
+        parts = scalars
+        dicts = {k: v for k, v in result.items() if isinstance(v, dict)}
+        lists = {k: v for k, v in result.items() if isinstance(v, list)}
+        if dicts and all(isinstance(vv, list) for v in dicts.values() for vv in v.values()):
+            parts += [f"**{k}**\n\n{table(v)}" for k, v in dicts.items()]
+        elif dicts:
+            df = pd.DataFrame(dicts).T.reset_index()
+            df.columns = ["column", *df.columns[1:]]
+            parts.append(table(df.to_dict("records")))
+        parts += [f"**{k}**\n\n{table(v)}" if v and isinstance(v[0], dict) else f"**{k}:** {v}"
+                  for k, v in lists.items()]
+        return "\n\n".join(parts)
+    if isinstance(result, list):
+        return table(result) if result and isinstance(result[0], dict) else ", ".join(map(str, result))
+    return f"**{result}**"
+
+
+@app.post("/api/run")
+def api_run():
+    """Direct tool call for /commands — no LLM involved."""
+    body = request.get_json(force=True)
+    dataset = combined_dataset(body.get("dataset_ids") or [body.get("dataset_id")])
+    if dataset is None:
+        return jsonify({"error": "Upload a file first"}), 400
+    try:
+        result = run_tool(dataset, body.get("tool", ""), body.get("args") or {})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "text": md_result(result)})
 
 
 @app.get("/")
@@ -303,10 +408,9 @@ def chat():
     body = request.get_json(force=True)
     req_id = body.get("request_id")
     want_think = body.get("think", True)  # False = fast mode: server skips chain-of-thought entirely
-    ds_id = body.get("dataset_id")
-    if ds_id not in DATASETS:
+    dataset = combined_dataset(body.get("dataset_ids") or [body.get("dataset_id")])
+    if dataset is None:
         return jsonify({"error": "Upload a file first"}), 400
-    dataset = DATASETS[ds_id]
     history = [m for m in body.get("messages", []) if m.get("role") in ("user", "assistant")][-10:]
     messages = [{"role": "system", "content": system_prompt(dataset)}, *history]
 
@@ -373,9 +477,10 @@ def chat():
                         entry = {"tool": c["name"], "args": args, "ok": True}
                     except Exception as e:
                         result = {"error": str(e)}
-                        entry = {"tool": c["name"], "args": args, "ok": False}
-                    tool_log.append(entry)
-                    yield ev({"type": "tool", **entry})
+                        entry = None if isinstance(e, Steer) else {"tool": c["name"], "args": args, "ok": False}
+                    if entry:
+                        tool_log.append(entry)
+                        yield ev({"type": "tool", **entry})
                     messages.append({
                         "role": "tool", "tool_call_id": c["id"],
                         "content": json.dumps(result, default=str)[:MAX_TOOL_RESULT_CHARS],
