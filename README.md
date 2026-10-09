@@ -1,5 +1,7 @@
 # tabitha
 
+![Tabitha — Chat with your spreadsheets](readmesrc/banner.png)
+
 Chat with your Excel gradebooks, attendance and test sheets in plain English, powered by a local LLM.
 
 Flask backend (`server/app.py`) + a Vue 3 / Vite frontend (`client/`). The LLM calls tools on the uploaded spreadsheet, so answers come from the actual data.
