@@ -1,37 +1,37 @@
-![Tabitha — Chat with your spreadsheets](readmesrc/banner.png)
+![Tabitha, chat with your spreadsheets](readmesrc/banner.png)
 
 # Tabitha
 
-**Your own local spreadsheet agent — powered by your own local LLM.**
+**Your own local spreadsheet agent, powered by your own local LLM.**
 
-Tabitha is a local AI assistant that lets you talk to your spreadsheets. Upload a gradebook, an attendance sheet, or a test record, and just ask: *"Who has the best average?"*, *"How many students were absent more than 10 days?"*, *"Chart the grades per section."* Tabitha reads the actual data, computes real answers, and replies with tables and charts — no formulas to remember, no menus to dig through.
+Tabitha is a local AI assistant that lets you talk to your spreadsheets. Upload a gradebook, an attendance sheet, or a test record, and just ask: *"Who has the best average?"*, *"How many students were absent more than 10 days?"*, *"Chart the grades per section."* Tabitha reads the actual data, computes real answers, and replies with tables and charts. You do not need to remember formulas or dig through menus.
 
-![Tabitha in action — chatting about a test-scores workbook](readmesrc/demo.gif)
+![Tabitha in action, chatting about a test-scores workbook](readmesrc/demo.gif)
 
 ## Why local?
 
-We believe AI belongs in everyone's hands — not behind a subscription, an API key, or an internet connection. This technology should make people's lives easier, and it can't do that if your data has to leave your device to use it.
+We believe AI belongs in everyone's hands, not behind a subscription, an API key, or an internet connection. This technology should make people's lives easier, and it cannot do that if your data has to leave your device to use it.
 
-Tabitha runs a real LLM — [MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) — on your own hardware via llama.cpp:
+Tabitha runs a real LLM, [MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B), on your own hardware through llama.cpp. This gives you:
 
-- **Private by design.** Your workbook never leaves the device. Grades, attendance, names — nothing is sent to a cloud API.
-- **Works offline.** After the one-time model download, no network is needed at all.
-- **Free forever.** No tokens, no usage caps, no accounts.
-- **Yours.** The whole stack — model, server, UI — runs where you can see it and control it.
+- **Privacy by design.** Your workbook never leaves the device. Grades, attendance, and names are never sent to a cloud API.
+- **Offline use.** After the one-time model download, no network is needed at all.
+- **Zero cost.** There are no tokens, usage caps, or accounts.
+- **Full control.** The whole stack (model, server, and UI) runs where you can see it and control it.
 
 Small models have gotten good enough to be genuinely useful. Tabitha is our proof: a 2B-parameter model on a laptop, acting as an agent over your files, is already a better experience than wrestling a spreadsheet UI.
 
 ## Quick start
 
-Requirements: **Python 3.10+**, **Node.js 20+**, **curl**. Linux x86_64 and macOS (arm64/x86_64).
+You need Python 3.10+, Node.js 20+, and curl. Linux x86_64 and macOS (arm64/x86_64) are supported.
 
 ```bash
 ./start.sh
 ```
 
-That's it. On first run it downloads the model (~1.5 GB, sha256-verified) from this repo's GitHub Releases, installs dependencies, builds the UI, starts `llama-server` on `127.0.0.1:2828`, and serves the app at **http://localhost:2424**.
+That is it. On first run it downloads the model (~1.5 GB, sha256-verified) from this repo's GitHub Releases, installs dependencies, builds the UI, starts `llama-server` on `127.0.0.1:2828`, and serves the app at **http://localhost:2424**.
 
-Try it with a sample: `client/public/samples/bicol_university_grades.xlsx` — drag it onto the chat window and ask a question.
+Try it with the sample file `client/public/samples/bicol_university_grades.xlsx`. Drag it onto the chat window and ask a question.
 
 > **Prefer a bigger model on another machine?** Point Tabitha at any OpenAI-compatible server and skip the local model entirely:
 > ```bash
@@ -56,14 +56,14 @@ flowchart LR
     API -- "OpenAI-compatible API · 127.0.0.1:2828/v1" --> LLM
 ```
 
-- **`server/`** — Flask API. Parses `.xlsx`/`.csv` into pandas DataFrames, builds the system prompt from the actual columns, and runs the LLM tool-calling loop. Streams progress to the client as NDJSON events.
-- **`client/`** — Vue 3 single-page app styled like a desktop OS: top bar, draggable windows, dock. Files render locally in a spreadsheet viewer *and* upload to the backend so Tabitha can query them.
-- **`vendor/llama/`** — bundled `llama-server` binaries (not committed; `start.sh` fetches the official release if absent).
-- **`models/`** — the GGUF weights (not committed; downloaded from GitHub Releases by `start.sh`).
+- **`server/`** is the Flask API. It parses `.xlsx` and `.csv` files into pandas DataFrames, builds the system prompt from the actual columns, and runs the LLM tool-calling loop. It streams progress to the client as NDJSON events.
+- **`client/`** is a Vue 3 single-page app styled like a desktop OS, with a top bar, draggable windows, and a dock. Files render locally in a spreadsheet viewer and also upload to the backend so Tabitha can query them.
+- **`vendor/llama/`** holds the bundled `llama-server` binaries. It is not committed to git. If it is missing, `start.sh` fetches the official llama.cpp release.
+- **`models/`** holds the GGUF weights. It is not committed to git. `start.sh` downloads it from GitHub Releases.
 
 ### Server request flow
 
-How a file and a question travel through the Flask backend:
+This diagram shows how an uploaded file and a chat question travel through the Flask backend:
 
 ```mermaid
 flowchart TD
@@ -76,7 +76,7 @@ flowchart TD
     SP --> SE["stream_events()<br>agentic tool loop"]
     CH --> SE
     SE ==>|"status · ctx · think · tool · delta · chart · done"| UI["NDJSON → client"]
-    R["POST /api/run<br>/commands — no LLM"] --> RT["run_tool()"]
+    R["POST /api/run<br>/commands, no LLM"] --> RT["run_tool()"]
     RT --> MD["md_result() → JSON → client"]
 ```
 
@@ -84,26 +84,26 @@ flowchart TD
 
 | | |
 |---|---|
-| **Model** | MiniCPM5-2B — 2B parameters |
-| **Creator** | [OpenBMB](https://huggingface.co/openbmb) — original model: [huggingface.co/openbmb/MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) |
-| **File** | `MiniCPM5-2B-Q4_K_M.gguf` — ~1.5 GB, Q4_K_M quantization |
+| **Model** | MiniCPM5-2B, 2B parameters |
+| **Creator** | [OpenBMB](https://huggingface.co/openbmb). Original model: [huggingface.co/openbmb/MiniCPM5-2B](https://huggingface.co/openbmb/MiniCPM5-2B) |
+| **File** | `MiniCPM5-2B-Q4_K_M.gguf`, about 1.5 GB, Q4_K_M quantization |
 | **Runtime** | llama.cpp `llama-server` (build b11527), vendored for offline dev |
 | **Context** | 16,384 tokens, single slot (`-c 16384 -np 1`) |
-| **Reasoning** | Native thinking mode; exposed as the **Deep Think** toggle, capped by `THINK_BUDGET` |
-| **Download** | This repo's [GitHub Releases](https://github.com/shuhailycasan/tabitha/releases/tag/Model) (mirror); sha256 pinned in `start.sh` |
+| **Reasoning** | Native thinking mode, exposed as the **Deep Think** toggle and capped by `THINK_BUDGET` |
+| **Download** | This repo's [GitHub Releases](https://github.com/shuhailycasan/tabitha/releases/tag/Model) mirror. The sha256 is pinned in `start.sh`. |
 
-A 2B model is small, so the server does a lot of quiet correction on its behalf: lenient argument coercion (`"5"` → `5`, `"false"` → `false`), loop detection when it repeats an identical call, one retry on empty replies, and `Steer` errors that are sent back to the model but hidden from the user.
+A 2B model is small, so the server does a lot of quiet correction on its behalf: lenient argument coercion (`"5"` to `5`, `"false"` to `false`), loop detection when it repeats an identical call, one retry on empty replies, and `Steer` errors that are sent back to the model but hidden from the user.
 
 ## Agentic capabilities
 
-Tabitha isn't a one-shot prompt — the backend runs an agent loop (`server/chat.py`):
+Tabitha is not a one-shot prompt. The backend runs an agent loop (`server/chat.py`):
 
-- **Tool calling.** The model calls spreadsheet tools (below), sees the real results, and answers — up to 8 tool rounds per question.
+- **Tool calling.** The model calls spreadsheet tools (listed below), reads the real results, and answers. It can use up to 8 tool rounds per question.
 - **Streaming transcript.** Every step is an NDJSON event (`status`, `ctx`, `compact`, `think`, `tool`, `delta`, `chart`, `done`, `error`), so the UI shows reasoning, tool chips, and text as they happen.
-- **Deep Think.** Optional chain-of-thought (`enable_thinking` + `reasoning_budget`), shown in a collapsible box. Off by default — roughly 4× faster.
-- **Multi-file scope.** Attach several files or `@mention` them per message; their sheets are pooled into one virtual dataset, and the magic sheet `"all"` outer-merges every sheet sharing a first column.
-- **Auto-compaction.** When the prompt would exceed 60% of the context window, the oldest turns are dropped and the user is told.
-- **Interruption.** Stop button or Enter-twice cancels mid-stream (`/api/cancel/<req_id>`), keeping whatever already streamed.
+- **Deep Think.** This is an optional chain-of-thought mode (`enable_thinking` + `reasoning_budget`), shown in a collapsible box. It is off by default, which keeps replies roughly 4× faster.
+- **Multi-file scope.** You can attach several files or `@mention` them per message. Their sheets are pooled into one virtual dataset, and the magic sheet `"all"` outer-merges every sheet that shares a first column.
+- **Auto-compaction.** When the prompt would exceed 60% of the context window, the oldest turns are dropped and the UI says so.
+- **Interruption.** The Stop button, or pressing Enter twice, cancels mid-stream (`/api/cancel/<req_id>`) and keeps whatever already streamed.
 - **Per-turn timer.** Each reply shows live elapsed time while it generates and the total once done.
 
 ### The tool loop
@@ -130,37 +130,37 @@ sequenceDiagram
     F-->>UI: done (reply + ctx usage)
 ```
 
-Identical repeated calls are steered back once ("you already have this result"), then the loop gives up gracefully — a known 2B failure mode. `Steer` errors reach the model but never the user's tool chips.
+Identical repeated calls are steered back once ("you already have this result"), then the loop gives up gracefully. This is a known failure mode of small models. `Steer` errors reach the model but never appear in the user's tool chips.
 
 ## Tools
 
-The model's toolset, defined in `server/tools/specs.py` and dispatched in `server/tools/dispatch.py`. The same tools back the `/commands` (called directly via `POST /api/run`, no LLM involved).
+These are the tools the model can call. They are defined in `server/tools/specs.py` and dispatched in `server/tools/dispatch.py`. The same tools power the `/commands`, which call them directly through `POST /api/run` without the LLM.
 
 | Tool | Args (required **bold**) | What it does |
 |---|---|---|
 | `summarize` | **sheet**, column | Class-wide stats per numeric column: mean, min, max, and *who* holds them |
 | `top_rows` | **sheet**, **column**, n, ascending | Rank rows by a column, top or bottom N |
-| `filter_rows` | **sheet**, **column**, **op**, **value**, limit | Rows matching a condition (`= != > < >= <= contains`) + match count |
-| `row_stats` | **sheet**, columns, op, ascending, limit | Per-row avg/sum/min/max across columns, ranked — e.g. each student's overall average |
+| `filter_rows` | **sheet**, **column**, **op**, **value**, limit | Rows matching a condition (`= != > < >= <= contains`) plus the match count |
+| `row_stats` | **sheet**, columns, op, ascending, limit | Per-row avg/sum/min/max across columns, ranked. Example: each student's overall average |
 | `list_rows` | **sheet**, columns, sort_by, ascending, limit | Sheet contents as a markdown table, optionally subset and sorted |
-| `group_stats` | **sheet**, **by**, columns, op, ascending | Totals/averages per group — e.g. which section has the most absences |
-| `bar_chart` | sheet, column, by, op, n, ascending — or custom labels + values | Renders a Chart.js bar chart from sheet data or from numbers the model computed itself |
-| `list_sheets` | — | Sheets in the loaded file(s) with row counts and column names |
-| `lookup` | **name** | Everything about one person/item: matching rows across *every* sheet |
+| `group_stats` | **sheet**, **by**, columns, op, ascending | Totals or averages per group. Example: which section has the most absences |
+| `bar_chart` | sheet, column, by, op, n, ascending; or custom labels + values | A Chart.js bar chart from sheet data, or from numbers the model computed itself |
+| `list_sheets` | (none) | Sheets in the loaded file(s) with row counts and column names |
+| `lookup` | **name** | Everything about one person or item: matching rows across *every* sheet |
 | `compute` | **expression** | Safe arithmetic (`+ - * / **`, `avg sum min max abs round`) when no other tool fits |
 
 ## Chat commands & mentions
 
-Instant shortcuts — they call the tools directly without waiting on the LLM. Tab-completes real sheet and column names.
+These are instant shortcuts. They call the tools directly without waiting on the LLM, and they autocomplete real sheet and column names as you type.
 
 | Command | Does |
 |---|---|
-| `/list [sheet] [n]` | Rows as a table (→ `list_rows`) |
-| `/stats [sheet] [column]` | Stats for a column or the whole sheet (→ `summarize`) |
-| `/top <column> [n]` | Highest rows (→ `top_rows`) |
-| `/bottom <column> [n]` | Lowest rows (→ `top_rows` ascending) |
-| `/chart <column> [n]` | Bar chart (→ `bar_chart`) |
-| `/lookup <name>` | Find a name in every sheet (→ `lookup`) |
+| `/list [sheet] [n]` | Rows as a table (calls `list_rows`) |
+| `/stats [sheet] [column]` | Stats for a column or the whole sheet (calls `summarize`) |
+| `/top <column> [n]` | Highest rows (calls `top_rows`) |
+| `/bottom <column> [n]` | Lowest rows (calls `top_rows` ascending) |
+| `/chart <column> [n]` | Bar chart (calls `bar_chart`) |
+| `/lookup <name>` | Find a name in every sheet (calls `lookup`) |
 | `/deepthink` · `/fast` | Toggle reasoning mode |
 | `/clear` · `/help` | Reset the chat / show commands |
 | `@file` | Include another uploaded file in the question's scope |
@@ -170,13 +170,13 @@ Instant shortcuts — they call the tools directly without waiting on the LLM. T
 | Endpoint | Purpose |
 |---|---|
 | `GET /` | Serves the built client (`client/dist`) |
-| `GET /api/health` | `{ ok, model, ctx }` |
-| `POST /api/upload` | Multipart `.xlsx`/`.csv` upload → dataset id, sheet info (25 MB max) |
-| `GET /api/datasets` | List uploaded datasets |
-| `DELETE /api/datasets/<id>` | Remove a dataset and its file |
-| `POST /api/chat` | `{ messages, dataset_ids, think, request_id }` → NDJSON event stream |
+| `GET /api/health` | Returns `{ ok, model, ctx }` |
+| `POST /api/upload` | Multipart `.xlsx`/`.csv` upload, returns dataset id and sheet info (25 MB max) |
+| `GET /api/datasets` | Lists uploaded datasets |
+| `DELETE /api/datasets/<id>` | Removes a dataset and its file |
+| `POST /api/chat` | `{ messages, dataset_ids, think, request_id }`, returns an NDJSON event stream |
 | `POST /api/run` | Direct tool call for `/commands`: `{ dataset_ids, tool, args }` |
-| `POST /api/cancel/<req_id>` | Stop a chat stream between tool rounds |
+| `POST /api/cancel/<req_id>` | Stops a chat stream between tool rounds |
 
 ## Configuration
 
@@ -184,9 +184,9 @@ Environment variables read by `server/app.py` and `start.sh`:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LLM_BASE_URL` | `http://127.0.0.1:2828/v1` | Any OpenAI-compatible endpoint; set it to skip the local model |
+| `LLM_BASE_URL` | `http://127.0.0.1:2828/v1` | Any OpenAI-compatible endpoint. Set it to skip the local model. |
 | `LLM_MODEL` | `models/MiniCPM5-2B-Q4_K_M.gguf` | Model alias sent to the server |
-| `CTX_TOKENS` | `16384` | Context window — must match llama-server's `-c` / `-np` |
+| `CTX_TOKENS` | `16384` | Context window. Must match llama-server's `-c` / `-np`. |
 | `THINK_BUDGET` | `500` | llama.cpp `reasoning_budget` for Deep Think |
 | `THINK_MAX_CHARS` | `1500` | Cap on reasoning text shown in the UI |
 | `PORT` | `2424` | Flask app port |
@@ -195,30 +195,30 @@ Environment variables read by `server/app.py` and `start.sh`:
 
 ## Frontend
 
-Vue 3 + Vite app in `client/`, styled like a Linux desktop:
+The frontend is a Vue 3 + Vite app in `client/`, styled like a Linux desktop:
 
-- `src/component/` — Vue SFCs: `TopBar`, `OsWindow` (shared window chrome), `SpreadsheetWindow`, `ChatWindow`, `Dock`, `Toast`, `MessageChart`
-- `src/feature/<name>/engine.js` — one engine per feature (`windows`, `chat`, `datasets`, `spreadsheet`, `desktop`, `files`); plain JS + reactive state, no DOM, easy to debug in isolation
-- `src/feature/excel-viewer-engine/` — standalone zero-dependency view-only spreadsheet reader (`.xlsx` via `DecompressionStream` + `DOMParser`, plus CSV/TSV); usable outside Vue
-- `src/assets/` — Tabitha mascot sprites; `public/favicon.png`, `public/samples/*.xlsx`
+- `src/component/` holds the Vue SFCs: `TopBar`, `OsWindow` (shared window chrome), `SpreadsheetWindow`, `ChatWindow`, `Dock`, `Toast`, `MessageChart`.
+- `src/feature/<name>/engine.js` is one engine per feature (`windows`, `chat`, `datasets`, `spreadsheet`, `desktop`, `files`). Each is plain JS plus reactive state with no DOM, so it is easy to debug in isolation.
+- `src/feature/excel-viewer-engine/` is a standalone, zero-dependency, view-only spreadsheet reader. It reads `.xlsx` through `DecompressionStream` and `DOMParser`, and also handles CSV and TSV. It is usable outside Vue.
+- `src/assets/` holds the Tabitha mascot sprites. `public/` holds the favicon and the sample `.xlsx` files.
 
 Hot-reload development:
 
 ```bash
 python server/app.py        # API on :2424
-cd client && npm run dev    # UI on :7777 — /api proxied to Flask
+cd client && npm run dev    # UI on :7777, /api proxied to Flask
 ```
 
 For production, `npm run build` emits `client/dist/`, which Flask serves at :2424. Rebuild after editing the frontend before running the Flask-only setup.
 
 ## Files
 
-- `server/app.py` — Flask API, upload/dataset management, chat endpoint
-- `server/chat.py` — the agentic LLM loop and NDJSON streaming
-- `server/tools/` — tool specs, dispatch, pandas helpers, charts, safe calculator
-- `server/prompts.py`, `server/state.py`, `server/config.py` — system prompt, dataset store, env config
-- `tests/` — pytest suite for the tools layer + upload/run endpoints
-- `scripts/make_samples.py` — regenerates the sample workbooks
+- `server/app.py`: the Flask API, upload and dataset management, and the chat endpoint.
+- `server/chat.py`: the agentic LLM loop and NDJSON streaming.
+- `server/tools/`: tool specs, dispatch, pandas helpers, charts, and a safe calculator.
+- `server/prompts.py`, `server/state.py`, `server/config.py`: the system prompt, the dataset store, and env config.
+- `tests/`: the pytest suite for the tools layer and the upload/run endpoints.
+- `scripts/make_samples.py`: regenerates the sample workbooks.
 
 ```bash
 .venv/bin/python -m pytest tests/   # no LLM needed
@@ -226,7 +226,7 @@ For production, `npm run build` emits `client/dist/`, which Flask serves at :242
 
 ### Publishing the model asset (maintainers)
 
-The model is too big for git — it lives as a release asset. One-time setup:
+The model is too big for git, so it lives as a release asset. One-time setup:
 
 ```bash
 gh release create Model --title "Model" --notes "Tabitha" \
