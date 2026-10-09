@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 
 # ---- config ---------------------------------------------------------------
 REPO="shuhailycasan/tabitha"
-RELEASE_TAG="v1.0"
+RELEASE_TAG="Model"
 MODEL_DIR="models"
 MODEL_NAME="MiniCPM5-2B-Q4_K_M.gguf"
 MODEL_FILE="$MODEL_DIR/$MODEL_NAME"

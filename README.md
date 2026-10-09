@@ -30,11 +30,11 @@ The model is too big for git — it lives as a release asset. One-time setup:
 
 ```bash
 # GitHub CLI
-gh release create v1.0 --title "v1.0" --notes "Tabitha" \
+gh release create Model --title "Model" --notes "Tabitha" \
   /path/to/MiniCPM5-2B-Q4_K_M.gguf
 ```
 
-or via the web UI: Releases → Draft a new release → tag `v1.0` → attach `MiniCPM5-2B-Q4_K_M.gguf`. The tag must match `RELEASE_TAG` in `start.sh`.
+or via the web UI: Releases → Draft a new release → tag `Model` → attach `MiniCPM5-2B-Q4_K_M.gguf`. The tag must match `RELEASE_TAG` in `start.sh`.
 
 ## Vue.js frontend
 
