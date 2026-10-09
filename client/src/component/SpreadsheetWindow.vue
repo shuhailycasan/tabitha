@@ -3,6 +3,7 @@
 // View-only rendering powered by excel-viewer-engine via the spreadsheet engine.
 import { ref, computed } from 'vue'
 import OsWindow from './OsWindow.vue'
+import ThinkSprite from './ThinkSprite.vue'
 import { spreadsheet } from '../feature/spreadsheet/engine.js'
 import { files } from '../feature/files/engine.js'
 import { columnName, viewSlice } from '../feature/excel-viewer-engine/index.js'
@@ -51,7 +52,10 @@ function onPickAttach() {
         <button class="primary" @click="pickAttach">Pick file to view</button>
       </div>
 
-      <div v-else-if="view?.loading" class="empty-sheet"><p>Reading {{ item.name }}…</p></div>
+      <div v-else-if="view?.loading" class="empty-sheet">
+        <ThinkSprite class="loading-sprite" />
+        <p>Reading {{ item.name }}…</p>
+      </div>
       <div v-else-if="view?.error" class="empty-sheet">
         <h1>Could not open that file</h1>
         <p>{{ view.error }}</p>

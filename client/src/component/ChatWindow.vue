@@ -2,6 +2,7 @@
 // Tabitha chat window — streams answers from the backend about the active dataset.
 import { ref, computed, watch, nextTick } from 'vue'
 import OsWindow from './OsWindow.vue'
+import ThinkSprite from './ThinkSprite.vue'
 import { chat } from '../feature/chat/engine.js'
 import { datasets } from '../feature/datasets/engine.js'
 import { files } from '../feature/files/engine.js'
@@ -27,7 +28,8 @@ const pendingMsg = computed(() => {
 const receiving = computed(() => !!(pendingMsg.value && pendingMsg.value.content))
 const dataset = computed(() => datasets.active.value)
 
-// mascot reacts to what the model is doing
+// mascot reacts to what the model is doing — thinking plays the sprite animation
+const thinking = computed(() => chat.state.sending && !pendingMsg.value?.tool_log?.length)
 const avatar = computed(() => {
   if (!chat.state.sending) return mascotHappy
   return pendingMsg.value?.tool_log?.length ? mascotWorking : mascotThinking
@@ -74,7 +76,8 @@ function send() {
             aria-label="Tabitha chat window" content-class="chat-content" header-class="chat-head">
     <template #title>
       <span class="chat-title">
-        <img class="tabitha-avatar" :src="avatar" alt="">
+        <ThinkSprite v-if="thinking" class="tabitha-avatar" />
+        <img v-else class="tabitha-avatar" :src="avatar" alt="">
         <span class="chat-title-text">
           <strong>Tabitha</strong>
           <small>Spreadsheet assistant · local</small>
@@ -98,6 +101,13 @@ function send() {
         <img :src="mascotWaving" alt="">
         <div class="bubble">Hi! I'm Tabitha<br>Open a spreadsheet and ask me to summarize it, find a value, or calculate totals.</div>
       </div>
+      <div v-if="!dataset" class="think-demo">
+        <div class="bubble typing" aria-hidden="true">
+          <ThinkSprite class="typing-sprite" />
+          <i></i><i></i><i></i>
+        </div>
+        <span class="think-demo-label">…this is me thinking</span>
+      </div>
 
       <template v-for="(m, i) in chat.state.messages" :key="i">
         <div v-for="(t, ti) in m.tool_log || []" :key="ti" class="toolchip" :class="{ bad: !t.ok }">
@@ -111,6 +121,7 @@ function send() {
       </template>
 
       <div v-if="chat.state.sending && !receiving" class="bubble typing" aria-label="Tabitha is thinking">
+        <ThinkSprite class="typing-sprite" />
         <i></i><i></i><i></i>
       </div>
     </div>
