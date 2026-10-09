@@ -99,7 +99,7 @@ flowchart TD
     D --> E{Assistant called<br>a tool?}
     E -- "yes" --> F["run_tool(name, args)<br>pandas over the DataFrames"]
     F --> G["tool chips + charts go to the UI<br>results appended to messages"]
-    G --> H{"same call repeated,<br>cancelled, or round 8?"}
+    G --> H{"same call repeated,<br>user cancelled, or hit<br>the 8-round cap?"}
     H -- "no, next round" --> D
     H -- "yes" --> Z(["done event to the UI<br>reply + ctx usage"])
     E -- "no, final answer" --> Z
