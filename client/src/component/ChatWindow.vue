@@ -9,8 +9,6 @@ import { datasets } from '../feature/datasets/engine.js'
 import { files } from '../feature/files/engine.js'
 import { spreadsheet } from '../feature/spreadsheet/engine.js'
 import mascotHappy from '../assets/tabitha-happy.png'
-import mascotThinking from '../assets/tabitha-thinking.png'
-import mascotWorking from '../assets/tabitha-working.png'
 import mascotWaving from '../assets/tabitha-waving.png'
 
 const log = ref(null)
@@ -29,12 +27,8 @@ const pendingMsg = computed(() => {
 const receiving = computed(() => !!(pendingMsg.value && pendingMsg.value.content))
 const dataset = computed(() => datasets.active.value)
 
-// mascot reacts to what the model is doing — thinking plays the sprite animation
-const thinking = computed(() => chat.state.sending && !pendingMsg.value?.tool_log?.length)
-const avatar = computed(() => {
-  if (!chat.state.sending) return mascotHappy
-  return pendingMsg.value?.tool_log?.length ? mascotWorking : mascotThinking
-})
+// one mascot, two states: animates while the model thinks, default while it replies
+const thinking = computed(() => chat.state.sending && !receiving.value)
 
 // dataset switch wipes the conversation, then greets with the new context
 watch(() => dataset.value?.id, (id, oldId) => {
@@ -104,7 +98,7 @@ function onKey(e) {
     <template #title>
       <span class="chat-title">
         <ThinkSprite v-if="thinking" class="tabitha-avatar" />
-        <img v-else class="tabitha-avatar" :src="avatar" alt="">
+        <img v-else class="tabitha-avatar" :src="mascotHappy" alt="">
         <span class="chat-title-text">
           <strong>Tabitha</strong>
           <small>Spreadsheet assistant · local</small>
@@ -128,14 +122,6 @@ function onKey(e) {
         <img :src="mascotWaving" alt="">
         <div class="bubble">Hi! I'm Tabitha<br>Open a spreadsheet and ask me to summarize it, find a value, or calculate totals.</div>
       </div>
-      <div v-if="!dataset" class="think-demo">
-        <div class="bubble typing" aria-hidden="true">
-          <ThinkSprite class="typing-sprite" />
-          <i></i><i></i><i></i>
-        </div>
-        <span class="think-demo-label">…this is me thinking</span>
-      </div>
-
       <template v-for="(m, i) in chat.state.messages" :key="i">
         <div v-for="(t, ti) in m.tool_log || []" :key="ti" class="toolchip" :class="{ bad: !t.ok }">
           {{ t.ok ? '⚙' : '✕' }} {{ t.tool }}({{ chat.shortArgs(t.args) }})
@@ -148,7 +134,6 @@ function onKey(e) {
       </template>
 
       <div v-if="chat.state.sending && !receiving" class="bubble typing" aria-label="Tabitha is thinking">
-        <ThinkSprite class="typing-sprite" />
         <i></i><i></i><i></i>
       </div>
     </div>

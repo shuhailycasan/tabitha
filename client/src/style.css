@@ -189,7 +189,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .chat-window.drop-target { outline: 3px dashed var(--green-2); outline-offset: -6px; border-color: var(--green-2); }
 .chat-head { height: 53px; }
 .chat-title { display: flex; align-items: center; gap: 9px; }
-.tabitha-avatar { width: 40px; height: 40px; object-fit: contain; border-radius: 50%; background: #eaf4e8; }
+.tabitha-avatar { width: 40px; height: 40px; object-fit: contain; }
 .chat-title-text { display: grid; gap: 2px; }
 .chat-title-text strong { font-size: 13px; }
 .chat-title-text small { font-size: 10px; color: var(--muted); font-weight: 400; }
@@ -210,8 +210,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .messages { flex: 1; min-height: 0; overflow-y: auto; padding: 15px 13px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
 .welcome { align-self: flex-start; display: flex; gap: 8px; max-width: 95%; align-items: flex-end; }
 .welcome img { width: 46px; height: 46px; object-fit: contain; flex: none; animation: hello 2.8s ease-in-out infinite; }
-.think-demo { align-self: flex-start; display: flex; flex-direction: column; gap: 3px; }
-.think-demo-label { font-size: 9.5px; color: #93a094; padding-left: 6px; }
 .bubble {
   max-width: 88%; padding: 10px 12px;
   border: 1px solid #e2e7e0; border-radius: 13px 13px 13px 4px;
@@ -220,8 +218,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 }
 .bubble.user { align-self: flex-end; border-color: #b8dbbf; border-radius: 13px 13px 4px 13px; background: #e4f3e6; color: #264d30; }
 .bubble:has(.tablewrap) { max-width: 100%; }
-.bubble.typing { display: flex; gap: 4px; align-items: center; padding: 6px 12px 6px 6px; }
-.bubble.typing .typing-sprite { width: 42px; height: 42px; }
+.bubble.typing { display: flex; gap: 4px; align-items: center; padding: 12px; }
 .bubble.typing i { width: 5px; height: 5px; border-radius: 50%; background: #7a9a7d; animation: dot 1s ease-in-out infinite; }
 .bubble.typing i:nth-child(2) { animation-delay: .15s; }
 .bubble.typing i:nth-child(3) { animation-delay: .3s; }
