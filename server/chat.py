@@ -54,7 +54,7 @@ def stream_events(req_id, want_think, dataset, messages, dropped):
             if dataset is not None:
                 call.update(tools=TOOLS, tool_choice="auto")
             stream = llm.chat.completions.create(**call)
-            content, reasoning, calls, finish = [], [], {}, None
+            content, calls, finish = [], {}, None
             think_chars, think_capped = 0, False
             for chunk in stream:
                 if not chunk.choices:
@@ -63,7 +63,6 @@ def stream_events(req_id, want_think, dataset, messages, dropped):
                 delta = chunk.choices[0].delta
                 think = getattr(delta, "reasoning_content", None)
                 if think:
-                    reasoning.append(think)
                     think_chars += len(think)
                     if think_chars <= THINK_MAX_CHARS:
                         yield {"type": "think", "text": think}
