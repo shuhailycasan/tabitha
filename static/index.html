@@ -83,6 +83,12 @@
   .msg { max-width: 80%; padding: 10px 14px; border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
   .msg.user { align-self: flex-end; background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; }
   .msg.bot { align-self: flex-start; background: var(--muted); border-bottom-left-radius: 4px; }
+  .msg.bot:has(table) { max-width: 100%; }
+  .tablewrap { overflow-x: auto; margin: 6px 0; white-space: normal; }
+  .msg table { border-collapse: collapse; font-size: 14px; background: var(--card); }
+  .msg th, .msg td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
+  .msg th { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+  .msg tbody tr:nth-child(even) { background: var(--bg); }
   .toolchip {
     align-self: flex-start; font-size: 12px; color: var(--muted-fg);
     background: var(--card); border: 1px solid var(--border);
@@ -284,9 +290,20 @@ createApp({
     shortArgs(args) {
       return Object.entries(args || {}).map(([k, v]) => `${k}=${v}`).join(', ');
     },
-    md(t) {  // minimal markdown: escape HTML first, then **bold** — model emits it, no lib needed
-      return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    md(t) {  // minimal markdown (escape HTML first): **bold** and | tables | — the only things the model emits
+      const L = (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').split('\n');
+      const row = l => /^\s*\|.*\|\s*$/.test(l);
+      const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const out = [];
+      for (let i = 0; i < L.length;) {
+        if (row(L[i]) && i + 1 < L.length && /^\s*\|[\s:|-]+\|\s*$/.test(L[i + 1])) {
+          const head = cells(L[i]); i += 2;
+          let body = '';
+          while (i < L.length && row(L[i])) body += '<tr>' + cells(L[i++]).map(c => `<td>${c}</td>`).join('') + '</tr>';
+          out.push(`<div class="tablewrap"><table><thead><tr>${head.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`);
+        } else out.push(L[i++]);
+      }
+      return out.join('\n').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     },
     async send() {
       const text = this.input.trim();

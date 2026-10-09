@@ -16,6 +16,7 @@ CASES = [  # (question, substrings that must all appear in the reply)
     ("Which student has the most days absent?", ["Gia", "15"]),
     ("How is Liam doing overall?", ["74", "88", "91"]),
     ("Which students scored above 90 in Science?", ["Ben", "Dan", "Gia", "Ivy", "Kim", "Liam"]),
+    ("List the students in a markdown table", ["| Student", "---", "| Ana", "| Olga"]),
 ]
 
 
