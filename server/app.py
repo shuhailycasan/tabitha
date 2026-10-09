@@ -12,10 +12,12 @@ LLM_BASE_URL = "http://192.168.0.159:2828/v1"
 LLM_MODEL = "models/MiniCPM5-2B-Q4_K_M.gguf"
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+CLIENT_DIR = Path(__file__).parent.parent / "client" / "dist"  # vite build output
 MAX_TOOL_RESULT_CHARS = 4000  # keep results small; the model has 8192 tokens total
 MAX_TOKENS = 4096  # reasoning model: ~2500 tokens of thinking before a tool call; 1024 truncated to nothing
 
-app = Flask(__name__)
+# static_url_path="" serves dist/assets/... at the root-absolute paths Vite emits
+app = Flask(__name__, static_folder=str(CLIENT_DIR), static_url_path="")
 llm = OpenAI(base_url=LLM_BASE_URL, api_key="none", timeout=300.0, max_retries=0)
 
 # ponytail: in-memory store keyed by dataset id, single process; switch to sqlite if sessions must survive restarts
@@ -55,6 +57,14 @@ TOOLS = [
          "columns": {"type": "array", "items": {"type": "string"}, "description": "Numeric columns to combine. Omit for all numeric columns."},
          "op": {"type": "string", "enum": ["avg", "sum", "min", "max"], "description": "Default avg"},
          "ascending": _ASC, "limit": {"type": "integer", "description": "Max rows (default 20)"}},
+        ["sheet"]),
+    _fn("list_rows",
+        "Show rows of a sheet as a ready-made markdown table (all rows, or the first N). Optional column subset and sort. "
+        "Use for: list the students, show the table, show everyone, show all data, list X sorted by Y.",
+        {"sheet": _SHEET,
+         "columns": {"type": "array", "items": {"type": "string"}, "description": "Columns to show. Omit for all columns."},
+         "sort_by": {**_COL, "description": "Optional column to sort by"},
+         "ascending": _ASC, "limit": {"type": "integer", "description": "Max rows (default 30)"}},
         ["sheet"]),
     _fn("lookup",
         "Everything about one person/item: finds rows matching a name in EVERY sheet. "
@@ -124,6 +134,15 @@ def rows_json(df, limit):
     return json.loads(df.head(min(int(limit), 100)).to_json(orient="records"))
 
 
+def md_table(df, total):
+    cell = lambda v: "" if pd.isna(v) else str(v.item() if hasattr(v, "item") else v).replace("|", "/")
+    rows = [f"| {' | '.join(map(str, df.columns))} |", "|" + "---|" * len(df.columns)]
+    rows += [f"| {' | '.join(cell(v) for v in r)} |" for r in df.itertuples(index=False)]
+    if len(df) < total:
+        rows.append(f"(showing {len(df)} of {total} rows)")
+    return "\n".join(rows)
+
+
 def holders(df, col, value):
     """Labels (first column) of the rows where col == value, capped so ties stay short."""
     return df.loc[df[col] == value, df.columns[0]].astype(str).head(5).tolist()
@@ -160,6 +179,12 @@ def run_tool(dataset, name, args):
             col = get_col(df, args["column"])
             return {"rows": len(df), col: summarize_col(df, col)}
         return {"rows": len(df), **{str(c): summarize_col(df, c) for c in df.columns[1:]}}
+    if name == "list_rows":
+        cols = [get_col(df, c) for c in args.get("columns") or df.columns]
+        out = df[cols]
+        if args.get("sort_by"):
+            out = out.sort_values(get_col(df, args["sort_by"]), ascending=bool(args.get("ascending", True)))
+        return {"table": md_table(out.head(min(int(args.get("limit") or 30), 50)), len(out))}
     if name == "top_rows":
         col = get_col(df, args["column"])
         return rows_json(df.sort_values(col, ascending=bool(args.get("ascending", False))), args.get("n", 5))
@@ -204,12 +229,14 @@ def system_prompt(dataset):
         "- who is above/below a value, how many match -> filter_rows\n"
         "- each student's average or total across several columns -> row_stats\n"
         "- everything about one student -> lookup\n"
+        "- list / show students or rows, or any request for a table -> list_rows, then paste its table into your answer exactly as given\n"
         "- any other arithmetic -> compute\n\n"
         "RULES:\n"
         "- Think in 2-3 short sentences, then call ONE tool. Do not plan every step in advance.\n"
         "- Use sheet and column names exactly as in DATA.\n"
         "- Every number and name in your answer must come from a tool result. Never calculate in your head.\n"
-        "- Answer in 1-3 plain sentences. Name the students and give the numbers."
+        "- You CAN show tables: write them as markdown tables. Never say you are unable to display data.\n"
+        "- Otherwise answer in 1-3 plain sentences. Name the students and give the numbers."
     )
 
 

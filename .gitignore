@@ -1,5 +1,10 @@
 __pycache__/
 *.pyc
 uploads/
-.playwright-mcp/
-.env
+node_modules/
+client/dist/
+
+# dotfiles — except .devin/ (project config, tracked)
+.*
+!.devin/
+!.gitignore

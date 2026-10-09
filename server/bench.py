@@ -6,6 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import subprocess
 import urllib.request
+from pathlib import Path
+
+SAMPLE = Path(__file__).parent.parent / "data" / "sample_grades.xlsx"
 
 BASE = "http://localhost:8777"
 THINK = "fast" not in sys.argv  # python bench.py fast  -> thinking off
@@ -16,6 +19,7 @@ CASES = [  # (question, substrings that must all appear in the reply)
     ("Which student has the most days absent?", ["Gia", "15"]),
     ("How is Liam doing overall?", ["74", "88", "91"]),
     ("Which students scored above 90 in Science?", ["Ben", "Dan", "Gia", "Ivy", "Kim", "Liam"]),
+    ("List the students in a markdown table", ["| Student", "---", "| Ana", "| Olga"]),
 ]
 
 
@@ -39,7 +43,7 @@ def run(case):
 
 
 if __name__ == "__main__":
-    DS = json.loads(subprocess.check_output(["curl", "-s", "-F", "file=@sample_grades.xlsx", f"{BASE}/api/upload"]))["id"]
+    DS = json.loads(subprocess.check_output(["curl", "-s", "-F", f"file=@{SAMPLE}", f"{BASE}/api/upload"]))["id"]
     with ThreadPoolExecutor(3) as ex:
         res = list(ex.map(run, CASES))
     for x in res:

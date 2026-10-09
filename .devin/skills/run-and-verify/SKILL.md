@@ -6,7 +6,7 @@ description: Run the Teacher Excel Chat Flask app and smoke-test it end to end. 
 # Run and verify
 
 Flask app: teacher uploads xlsx/csv, chats with a local LLM that answers via pandas tool calls.
-Entry point is `app.py` (single file, port **8777** — 5000 is reserved on Windows, 8000 is in use).
+Entry point is `server/app.py` (single file, port **8777** — 5000 is reserved on Windows, 8000 is in use).
 
 ## 1. Check the LLM server first
 
@@ -21,16 +21,16 @@ Model: `models/MiniCPM5-2B-Q4_K_M.gguf` (2B model, ~8 tok/s — expect slow, sim
 ## 2. Run
 
 ```bash
-python app.py
+python server/app.py
 ```
 
-Serves `templates/index.html` at http://localhost:8777 (Vue frontend, vendored in `static/vendor/` — no build step, no npm).
+Serves the built Vue frontend at http://localhost:8777 — run `cd client && npm run build` first (output: `client/dist/`). For UI work, `cd client && npm run dev` runs Vite on :5173 with `/api` proxied to Flask on :8777.
 
 ## 3. Smoke test (this is the project's runnable check)
 
 ```bash
 # upload
-curl -s -F "file=@sample_grades.xlsx" http://localhost:8777/api/upload
+curl -s -F "file=@data/sample_grades.xlsx" http://localhost:8777/api/upload
 # -> note the "id" in the response
 
 # chat (replace <ID>) — streams NDJSON, one event per line
@@ -44,8 +44,8 @@ curl -s -N -X POST http://localhost:8777/api/chat \
 
 ## Gotchas
 
-- `DATASETS` is in-memory and `use_reloader=False` (stat reloader hangs under WSL interop) → **restart `python app.py` manually after code changes, then re-upload the file** before testing chat, or you get `{"error":"Upload a file first"}`.
-- Only ONE process can usefully serve port 8777, but Werkzeug's `SO_REUSEADDR` lets a second `python app.py` bind without erroring — requests then randomly hit the stale process. If behavior doesn't match the code, check `netstat -ano | grep 8777` for duplicate listeners and kill the old PID.
+- `DATASETS` is in-memory and `use_reloader=False` (stat reloader hangs under WSL interop) → **restart `python server/app.py` manually after code changes, then re-upload the file** before testing chat, or you get `{"error":"Upload a file first"}`.
+- Only ONE process can usefully serve port 8777, but Werkzeug's `SO_REUSEADDR` lets a second `python server/app.py` bind without erroring — requests then randomly hit the stale process. If behavior doesn't match the code, check `netstat -ano | grep 8777` for duplicate listeners and kill the old PID.
 - Chat loops at most 8 tool-call rounds, then returns a fallback reply — that's normal, not a crash.
 - Tool results are truncated at 4000 chars (`MAX_TOOL_RESULT_CHARS`); the 2B model cannot handle big dumps.
 - `uploads/` accumulates uploaded files on disk; datasets survive there but not in memory.
