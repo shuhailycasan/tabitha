@@ -46,15 +46,14 @@ Try it with a sample: `client/public/samples/bicol_university_grades.xlsx` — d
 
 ```mermaid
 flowchart LR
-    subgraph browser["Browser"]
-        UI["client/ · Vue 3 + Vite<br>desktop-style UI · Chart.js"]
-    end
     subgraph host["Your machine"]
+        UI["client/ · Vue 3 + Vite<br>desktop-style UI · Chart.js<br>(runs in the browser)"]
         API["server/ · Flask<br>agentic tool loop · pandas"]
         LLM["llama-server · llama.cpp b11527<br>MiniCPM5-2B · 16k ctx"]
     end
-    UI -- "NDJSON stream · /api/chat · /api/run" --> API
-    API -- "OpenAI-compatible API · 127.0.0.1:2828" --> LLM
+    UI -- "/api/chat · /api/run · /api/upload" --> API
+    API -. "NDJSON event stream" .-> UI
+    API -- "OpenAI-compatible API · 127.0.0.1:2828/v1" --> LLM
 ```
 
 - **`server/`** — Flask API. Parses `.xlsx`/`.csv` into pandas DataFrames, builds the system prompt from the actual columns, and runs the LLM tool-calling loop. Streams progress to the client as NDJSON events.
